@@ -175,6 +175,12 @@ esp_err_t config_saveall(void);
 esp_err_t config_init(void);
 
 /**
+ * @brief Mark configuration as invalid and restart device
+ * @return ESP_OK if successful, other ESP error code if operation failed
+ */
+esp_err_t config_factory_reset(void);
+
+/**
  * @brief Deinitialize configuration
  * @return ESP_OK if successful, other ESP error code if commit failed before close
  */

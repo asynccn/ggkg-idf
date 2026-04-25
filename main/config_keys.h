@@ -25,9 +25,6 @@
 // char[16], DNS2
 #define CONF_KEY_DNS2                   "dns2"
 
-// char[16], Web server address
-#define CONF_KEY_WSERVER_ADDR           "wservaddr"
-
 // uint16_t, Web server port
 #define CONF_KEY_WSERVER_PORT           "wservport"
 // char[32], Web server username
