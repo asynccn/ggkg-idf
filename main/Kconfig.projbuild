@@ -1,0 +1,125 @@
+menu "GGKG"
+    choice CAMERA_MODEL
+        prompt "Camera Model"
+        default CAMERA_MODEL_AI_THINKER
+        help 
+            Select a camera model
+        
+        config CAMERA_MODEL_WROVER_KIT
+            bool "ESP Wrover Kit"
+        
+        config CAMERA_MODEL_ESP_EYE
+            bool "ESP Eye"
+        
+        config CAMERA_MODEL_M5STACK_PSRAM
+            bool "M5Stack (With PSRAM)"
+
+        config CAMERA_MODEL_M5STAC_V2_PSRAM
+            bool "M5Stack V2 (With PSRAM)"
+
+        config CAMERA_MODEL_M5STACK_WIDE
+            bool "M5Stack Wide"
+
+        config CAMERA_MODEL_M5STACK_ESP32CAM
+            bool "M5Stack ESP32CAM"
+
+        config CAMERA_MODEL_M5STACK_UNITCAM
+            bool "M5Stack Unitcam"
+
+        config CAMERA_MODEL_AI_THINKER
+            bool "AI-Thinker ESP32-CAM Board"
+
+        config CAMERA_MODEL_TTGO_T_JOURNAL
+            bool "TTGO-T Journal"
+
+        config CAMERA_MODEL_ESP32S3_WROOM
+            bool "ESP32-S3 WROOM"
+    endchoice
+    config ENABLE_LED_FLASH
+        bool "Enable Built-in LED Flash (if exist)"
+
+    config ENABLE_SDCARD
+        bool "Enable SD Card (if exist)"
+    
+    config CAMERA_XCLK_FREQ_HZ
+        int "Camera XCLK Frequency (Hz)"
+        default 20000000
+        help
+            XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
+
+    config CAMERA_JPEG_QUALITY
+        int "JPEG Quality"
+        default 12
+        help
+            0-63, for OV series camera sensors, lower number means higher quality
+    
+    # choice CAMERA_FRAME_SIZE
+    #     prompt "Frame size"
+    #     default FRAMESIZE_QVGA
+    #     help 
+    #         Frame size of the picture from the camera sensor
+
+    #     config FRAMESIZE_96X96
+    #         bool "96 x 96"
+
+    #     config FRAMESIZE_QQVGA
+    #         bool "QQVGA (160 x 120)"
+    # endchoice
+endmenu
+
+menu "Network"
+    choice ESP_WIFI_SAE_MODE
+        prompt "WPA3 SAE mode selection"
+        default ESP_STATION_EXAMPLE_WPA3_SAE_PWE_BOTH
+        help
+            Select mode for SAE as Hunt and Peck, H2E or both.
+        config ESP_STATION_EXAMPLE_WPA3_SAE_PWE_HUNT_AND_PECK
+            bool "HUNT AND PECK"
+        config ESP_STATION_EXAMPLE_WPA3_SAE_PWE_HASH_TO_ELEMENT
+            bool "H2E"
+            depends on ESP_WIFI_ENABLE_SAE_H2E
+        config ESP_STATION_EXAMPLE_WPA3_SAE_PWE_BOTH
+            bool "BOTH"
+            depends on ESP_WIFI_ENABLE_SAE_H2E
+    endchoice
+
+    config ESP_WIFI_PW_ID
+        string "PASSWORD IDENTIFIER"
+        depends on  ESP_STATION_EXAMPLE_WPA3_SAE_PWE_HASH_TO_ELEMENT|| ESP_STATION_EXAMPLE_WPA3_SAE_PWE_BOTH
+        default ""
+        help
+            password identifier for SAE H2E
+
+    config ESP_MAXIMUM_RETRY
+        int "Maximum retry"
+        default 5
+        help
+            Set the Maximum retry to avoid station reconnecting to the AP unlimited when the AP is really inexistent.
+
+    choice ESP_WIFI_SCAN_AUTH_MODE_THRESHOLD
+        prompt "WiFi Scan auth mode threshold"
+        default ESP_WIFI_AUTH_WPA2_PSK
+        help
+            The weakest authmode to accept in the scan mode.
+            This value defaults to ESP_WIFI_AUTH_WPA2_PSK in case password is present and ESP_WIFI_AUTH_OPEN is used.
+            Please select ESP_WIFI_AUTH_WEP/ESP_WIFI_AUTH_WPA_PSK in case AP is operating in WEP/WPA mode.
+
+        config ESP_WIFI_AUTH_OPEN
+            bool "OPEN"
+        config ESP_WIFI_AUTH_WEP
+            bool "WEP"
+        config ESP_WIFI_AUTH_WPA_PSK
+            bool "WPA PSK"
+        config ESP_WIFI_AUTH_WPA2_PSK
+            bool "WPA2 PSK"
+        config ESP_WIFI_AUTH_WPA_WPA2_PSK
+            bool "WPA/WPA2 PSK"
+        config ESP_WIFI_AUTH_WPA3_PSK
+            bool "WPA3 PSK"
+        config ESP_WIFI_AUTH_WPA2_WPA3_PSK
+            bool "WPA2/WPA3 PSK"
+        config ESP_WIFI_AUTH_WAPI_PSK
+            bool "WAPI PSK"
+    endchoice
+
+endmenu
