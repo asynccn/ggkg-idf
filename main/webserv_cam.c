@@ -18,6 +18,7 @@
 #include "camera.h"
 #include "ra_filter.h"
 #include "webserver.h"
+#include "config_vars.h"
 
 static const char *TAG = "wshandler_cam";
 
@@ -35,7 +36,7 @@ static esp_err_t handler_capture(httpd_req_t *req)
     }
 
     esp_err_t err = ESP_OK;
-    err = webserver_auth_req_basic(req, "Z2drZzpnZ2tn");
+    err = webserver_auth_req_basic(req, cfg_wserver_user, cfg_wserver_pass);
     if (err == ESP_ERR_NOT_FOUND)
     {
         ESP_LOGE(TAG, "auth failed, invalid credential");
@@ -98,7 +99,7 @@ static esp_err_t handler_stream(httpd_req_t *req)
     }
 
     esp_err_t err = ESP_OK;
-    err = webserver_auth_req_basic(req, "Z2drZzpnZ2tn");
+    err = webserver_auth_req_basic(req, cfg_wserver_user, cfg_wserver_pass);
     if (err == ESP_ERR_NOT_FOUND)
     {
         ESP_LOGE(TAG, "auth failed, invalid credential");

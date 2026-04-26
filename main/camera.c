@@ -46,6 +46,7 @@
 
 #include "esp_camera.h"
 #include "camera_pins.h"
+#include "config_vars.h"
 
 static const char *TAG = "camera";
 
@@ -91,6 +92,39 @@ esp_err_t camera_init(void)
     {
         ESP_LOGE(TAG, "Camera Init Failed due to %s", esp_err_to_name(err));
         return err;
+    }
+
+    sensor_t *sensor = esp_camera_sensor_get();
+    if (sensor != NULL)
+    {
+        int rc = 0;
+
+        if (cfg_cam_framesize <= FRAMESIZE_INVALID)
+        {
+            rc = sensor->set_framesize(sensor, (framesize_t)cfg_cam_framesize);
+            if (rc != 0)
+            {
+                ESP_LOGW(TAG, "set_framesize failed: %d", rc);
+            }
+        }
+
+        rc = sensor->set_quality(sensor, cfg_cam_jpeg_qual);
+        if (rc != 0)
+        {
+            ESP_LOGW(TAG, "set_quality failed: %d", rc);
+        }
+
+        rc = sensor->set_hmirror(sensor, cfg_cam_hflip ? 1 : 0);
+        if (rc != 0)
+        {
+            ESP_LOGW(TAG, "set_hmirror failed: %d", rc);
+        }
+
+        rc = sensor->set_vflip(sensor, cfg_cam_vflip ? 1 : 0);
+        if (rc != 0)
+        {
+            ESP_LOGW(TAG, "set_vflip failed: %d", rc);
+        }
     }
 
     return ESP_OK;

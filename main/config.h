@@ -14,6 +14,40 @@
 #include <stdint.h>
 
 #include "esp_err.h"
+#include "config_keys.h"
+
+typedef enum {
+    CONFIG_VALUE_U8,
+    CONFIG_VALUE_U16,
+    CONFIG_VALUE_U32,
+    CONFIG_VALUE_S8,
+    CONFIG_VALUE_S16,
+    CONFIG_VALUE_S32,
+    CONFIG_VALUE_S64,
+    CONFIG_VALUE_BOOL,
+    CONFIG_VALUE_STR,
+    CONFIG_VALUE_BLOB,
+} config_value_type_t;
+
+/**
+ * @brief Unified read API by key string and type
+ */
+esp_err_t config_read_any(const char *key, config_value_type_t type, void *val, uint16_t len);
+
+/**
+ * @brief Unified write API by key string and type
+ */
+esp_err_t config_write_any(const char *key, config_value_type_t type, const void *val, uint16_t len);
+
+/**
+ * @brief Unified read API by typed item id (bound to config_vars variable)
+ */
+esp_err_t config_read_item(config_item_id_t item);
+
+/**
+ * @brief Unified write API by typed item id (bound to config_vars variable)
+ */
+esp_err_t config_write_item(config_item_id_t item);
 
 /**
  * @brief Read a string from the configuration
@@ -167,6 +201,12 @@ esp_err_t config_writes64(const char *key, int64_t val);
  * @return ESP_OK if successful, ESP_ERR_INVALID_STATE if configuration is not initialized
  */
 esp_err_t config_saveall(void);
+
+/**
+ * @brief Commit pending configuration writes to flash
+ * @return ESP_OK if successful, other ESP error code if commit failed
+ */
+esp_err_t config_commit(void);
 
 /**
  * @brief Initialize configuration

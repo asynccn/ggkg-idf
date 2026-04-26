@@ -13,6 +13,7 @@
 #include "webserv_cam.h"
 #include "webserv_sys.h"
 #include "fota.h"
+#include "config.h"
 
 static const char *TAG = "app_main";
 
@@ -86,6 +87,8 @@ void app_main(void)
     ESP_LOGI(TAG, GGKG_CONSOLE_SPLASH);
 
     esp_err_t err;
+    config_init();
+    ESP_LOGI(TAG, "Done loading config");
     console_start();
     network_init();
     err = webserver_start();

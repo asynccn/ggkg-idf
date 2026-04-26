@@ -1,51 +1,48 @@
 #ifndef CONFIG_KEYS_H
 #define CONFIG_KEYS_H
 
+#include "config_vars.h"
+
 // uint8_t, magic value to check if the config is valid, change if the user settings must be reset
-#define CONF_KEY_MAGIC                  "magic"
+#define CONF_KEY_MAGIC "magic"
 
-// char[32], host name of the device on the network
-#define CONF_KEY_HOSTNAME               "hostname"
-// char[32], WiFi SSID
-#define CONF_KEY_WIFI_SSID              "wifissid"
-// char[64], WiFi password (preshared key)
-#define CONF_KEY_WIFI_PSK               "wifipsk"
-// bool, DHCP enabled
-#define CONF_KEY_DHCP                   "dhcp"
-// char[16], IP address
-#define CONF_KEY_IP_ADDR                "ipaddr"
-// char[16], netmask
-#define CONF_KEY_NETMASK                "netmask"
-// char[16], gateway
-#define CONF_KEY_GATEWAY                "gateway"
-// bool, custom DNS enabled
-#define CONF_KEY_CUSTOM_DNS             "customdns"
-// char[16], DNS1
-#define CONF_KEY_DNS1                   "dns1"
-// char[16], DNS2
-#define CONF_KEY_DNS2                   "dns2"
+/**
+ * @brief Central configuration item list (id, type, nvs key, bound variable, string/blob length)
+ */
+#define CONFIG_ITEM_TABLE(X) \
+    X(HOSTNAME, STR,  "hostname",  cfg_hostname,            CFG_STR_HOSTNAME_LEN) \
+    X(WIFI_SSID, STR, "wifissid",  cfg_wifi_ssid,           CFG_STR_WIFI_SSID_LEN) \
+    X(WIFI_PSK, STR,  "wifipsk",   cfg_wifi_psk,            CFG_STR_WIFI_PSK_LEN) \
+    X(DHCP, BOOL,     "dhcp",      cfg_dhcp,                0) \
+    X(IP_ADDR, STR,   "ipaddr",    cfg_ip_addr,             CFG_STR_IPV4_LEN) \
+    X(NETMASK, STR,   "netmask",   cfg_netmask,             CFG_STR_IPV4_LEN) \
+    X(GATEWAY, STR,   "gateway",   cfg_gateway,             CFG_STR_IPV4_LEN) \
+    X(CUSTOM_DNS, BOOL, "customdns", cfg_custom_dns,        0) \
+    X(DNS1, STR,      "dns1",      cfg_dns1,                CFG_STR_IPV4_LEN) \
+    X(DNS2, STR,      "dns2",      cfg_dns2,                CFG_STR_IPV4_LEN) \
+    X(WSERVER_PORT, U16, "wservport", cfg_wserver_port,      0) \
+    X(WSERVER_USER, STR, "wservuser", cfg_wserver_user,      CFG_STR_WSERVER_USER_LEN) \
+    X(WSERVER_PASS, STR, "wservpass", cfg_wserver_pass,      CFG_STR_WSERVER_PASS_LEN) \
+    X(CAM_FRAMESIZE, U8, "framesize", cfg_cam_framesize,     0) \
+    X(CAM_JPEG_QUAL, U8, "jpegq",   cfg_cam_jpeg_qual,       0) \
+    X(CAM_HFLIP, BOOL, "hflip",     cfg_cam_hflip,           0) \
+    X(CAM_VFLIP, BOOL, "vflip",     cfg_cam_vflip,           0) \
+    X(SERVO_PITCH_ANG, U16, "pitch", cfg_servo_pitch_ang,    0) \
+    X(SERVO_YAW_ANG, U16, "yaw",    cfg_servo_yaw_ang,       0) \
+    X(SERVO_SILENT_INT_MS, U16, "silintrv", cfg_servo_silent_int_ms, 0)
 
-// uint16_t, Web server port
-#define CONF_KEY_WSERVER_PORT           "wservport"
-// char[32], Web server username
-#define CONF_KEY_WSERVER_USER           "wservuser"
-// char[64], Web server password
-#define CONF_KEY_WSERVER_PASS           "wservpass"
+typedef enum {
+#define X(id, type, key, var, len) CONFIG_ITEM_##id,
+    CONFIG_ITEM_TABLE(X)
+#undef X
+    CONFIG_ITEM_COUNT
+} config_item_id_t;
 
-// uint8_t, camera frame size
-#define CONF_KEY_CAM_FRAMESIZE          "framesize"
-// uint8_t, camera JPEG quality
-#define CONF_KEY_CAM_JPEG_QUAL          "jpegq"
-// bool, camera horizontal flip
-#define CONF_KEY_CAM_HFLIP              "hflip"
-// bool, camera vertical flip
-#define CONF_KEY_CAM_VFLIP              "vflip"
-
-// uint16_t, servo pitch angle
-#define CONF_KEY_SERVO_PITCH_ANG        "pitch"
-// uint16_t, servo yaw angle
-#define CONF_KEY_SERVO_YAW_ANG          "yaw"
-// uint16_t, servo silent interval
-#define CONF_KEY_SERVO_SILENT_INT_MS    "silintrv"
+// User-facing item constants (pass one constant to unified read/write API)
+enum {
+#define X(id, type, key, var, len) CONF_ITEM_##id = CONFIG_ITEM_##id,
+    CONFIG_ITEM_TABLE(X)
+#undef X
+};
 
 #endif

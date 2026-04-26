@@ -18,6 +18,8 @@
 #include "esp_http_server.h"
 #include "esp_log.h"
 
+#include "config_vars.h"
+
 static const char *TAG = "webserver";
 
 #define AUTH_HEADER_LEN_MAX     100
@@ -182,7 +184,7 @@ esp_err_t webserver_reg_uri_handle(httpd_uri_t *handle)
 esp_err_t webserver_start(void)
 {
     esp_err_t err = ESP_OK;
-    httpd_config_server.server_port = 80;
+    httpd_config_server.server_port = (cfg_wserver_port == 0U) ? 80U : cfg_wserver_port;
     httpd_config_server.max_open_sockets = 2;
     ESP_LOGI(TAG, "starting on port %u", httpd_config_server.server_port);
     err = httpd_start(&httpd_handle_server, &httpd_config_server);

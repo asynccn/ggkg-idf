@@ -28,13 +28,12 @@
 #include "esp_system.h"
 
 #include "webserver.h"
+#include "config_vars.h"
 
 static const char *TAG = "fota";
 
 #define FOTA_URI_PAGE "/ota"
 #define FOTA_URI_UPLOAD "/ota"
-#define FOTA_AUTH_USER "ggkg"
-#define FOTA_AUTH_PASS "ggkg"
 #define FOTA_RECV_BUF_LEN 4096
 #define FOTA_RESTART_DELAY_MS 1200
 
@@ -184,7 +183,7 @@ static esp_err_t fota_check_auth(httpd_req_t *req)
         return ESP_OK;
     }
 
-    esp_err_t err = webserver_auth_req_basic(req, FOTA_AUTH_USER, FOTA_AUTH_PASS);
+    esp_err_t err = webserver_auth_req_basic(req, cfg_wserver_user, cfg_wserver_pass);
     if (err == ESP_OK)
     {
         return ESP_OK;
