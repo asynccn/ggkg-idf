@@ -19,6 +19,7 @@
 #include "esp_log.h"
 
 #include "config_vars.h"
+#include "htdocs.h"
 
 static const char *TAG = "webserver";
 
@@ -181,18 +182,61 @@ esp_err_t webserver_reg_uri_handle(httpd_uri_t *handle)
     return httpd_register_uri_handler(httpd_handle_server, handle);
 }
 
+static esp_err_t handler_index(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/html");
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    return httpd_resp_send(req, (const char *)index_ov2640_html_gz, index_ov2640_html_gz_len);
+}
+
+static esp_err_t handler_favicon(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "image/x-icon");
+    httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
+    return httpd_resp_send(req, (const char *)favicon_ico_gz, favicon_ico_gz_len);
+}
+
 esp_err_t webserver_start(void)
 {
     esp_err_t err = ESP_OK;
     httpd_config_server.server_port = (cfg_wserver_port == 0U) ? 80U : cfg_wserver_port;
     httpd_config_server.max_open_sockets = 2;
     ESP_LOGI(TAG, "starting on port %u", httpd_config_server.server_port);
+
     err = httpd_start(&httpd_handle_server, &httpd_config_server);
     if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "start failed due to %s", esp_err_to_name(err));
+        return err;
     }
-    return err;
+
+    httpd_uri_t uri_handle_index = {
+        .uri = "/",
+        .method = HTTP_GET,
+        .handler = handler_index,
+        .user_ctx = NULL
+    };
+    err = httpd_register_uri_handler(httpd_handle_server, &uri_handle_index);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "register / failed due to %s", esp_err_to_name(err));
+        return err;
+    }
+
+    httpd_uri_t uri_handle_favicon = {
+        .uri = "/favicon.ico",
+        .method = HTTP_GET,
+        .handler = handler_favicon,
+        .user_ctx = NULL
+    };
+    err = httpd_register_uri_handler(httpd_handle_server, &uri_handle_favicon);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "register /favicon.ico failed due to %s", esp_err_to_name(err));
+        return err;
+    }
+
+    return ESP_OK;
 }
 
 esp_err_t webserver_stop(void)
