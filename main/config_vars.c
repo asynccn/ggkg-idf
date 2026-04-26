@@ -29,7 +29,7 @@ uint16_t cfg_wserver_port = 80;
 char cfg_wserver_user[CFG_STR_WSERVER_USER_LEN] = "ggkg";
 char cfg_wserver_pass[CFG_STR_WSERVER_PASS_LEN] = "ggkg";
 
-uint8_t cfg_cam_framesize = 10;
+uint8_t cfg_cam_framesize = FRAMESIZE_QVGA;
 uint8_t cfg_cam_jpeg_qual = 12;
 bool cfg_cam_hflip = false;
 bool cfg_cam_vflip = false;
