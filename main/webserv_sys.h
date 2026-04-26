@@ -1,4 +1,15 @@
-#ifndef WEBSERV_SYS_H
+/**
+ * @file webserv_sys.h
+ * @author kontornl
+ * @brief Webserver handler for system settings
+ * @version 0.1
+ * @date 2025-05-23
+ *
+ * @copyright Copyright (c) 2025 A-Sync Research Institute China
+ *
+ */
+
+ #ifndef WEBSERV_SYS_H
 #define WEBSERV_SYS_H
 
 #include "esp_err.h"
