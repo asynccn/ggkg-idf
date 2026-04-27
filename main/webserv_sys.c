@@ -20,9 +20,13 @@
 
 #include <strings.h>
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
 #include "esp_err.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "esp_system.h"
 
 #include "config.h"
 #include "config_keys.h"
@@ -30,6 +34,9 @@
 #include "webserver.h"
 
 static const char *TAG = "wshandler_sys";
+#define SYS_RESTART_DELAY_MS 300
+
+
 
 typedef struct
 {
@@ -439,6 +446,61 @@ static esp_err_t handler_config(httpd_req_t *req)
                     HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
+static esp_err_t handler_hostname(httpd_req_t *req)
+{
+    if (req == NULL)
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, cfg_hostname, HTTPD_RESP_USE_STRLEN);
+}
+
+static void sys_restart_task(void *arg)
+{
+    (void)arg;
+    vTaskDelay(pdMS_TO_TICKS(SYS_RESTART_DELAY_MS));
+    esp_restart();
+}
+
+static esp_err_t handler_restart(httpd_req_t *req)
+{
+    if (req == NULL)
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_err_t err = webserver_auth_req_basic(req, cfg_wserver_user, cfg_wserver_pass);
+    if (err == ESP_ERR_NOT_FOUND)
+    {
+        ESP_LOGE(TAG, "auth failed, invalid credential");
+        return ESP_OK;
+    }
+    if (err == ESP_ERR_NOT_SUPPORTED)
+    {
+        ESP_LOGW(TAG, "no credential provided");
+        return ESP_OK;
+    }
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "auth failed due to %s", esp_err_to_name(err));
+        return ESP_OK;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_send(req, "{\"ok\":true,\"restart\":true}", HTTPD_RESP_USE_STRLEN);
+
+    if (xTaskCreate(sys_restart_task, "sys_restart", 2048, NULL, 5, NULL) != pdPASS)
+    {
+        ESP_LOGE(TAG, "failed to create restart task");
+    }
+
+    return ESP_OK;
+}
+
 esp_err_t webserv_sys_init(void)
 {
     esp_err_t err = ESP_OK;
@@ -450,5 +512,30 @@ esp_err_t webserv_sys_init(void)
         .user_ctx = NULL};
 
     err = webserver_reg_uri_handle(&uri_handle_config);
+    if (err != ESP_OK)
+    {
+        return err;
+    }
+
+    httpd_uri_t uri_handle_hostname = {
+        .uri = "/sys/hostname",
+        .method = HTTP_GET,
+        .handler = handler_hostname,
+        .user_ctx = NULL};
+
+    err = webserver_reg_uri_handle(&uri_handle_hostname);
+    if (err != ESP_OK)
+    {
+        return err;
+    }
+
+    httpd_uri_t uri_handle_restart = {
+        .uri = "/restart",
+        .method = HTTP_GET,
+        .handler = handler_restart,
+        .user_ctx = NULL};
+
+    err = webserver_reg_uri_handle(&uri_handle_restart);
     return err;
 }
+

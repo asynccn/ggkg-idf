@@ -11,6 +11,7 @@
 #include "network.h"
 #include "webserver.h"
 #include "webserv_cam.h"
+#include "webserv_servo.h"
 #include "webserv_sys.h"
 #include "fota.h"
 #include "config.h"
@@ -92,17 +93,39 @@ void app_main(void)
     esp_err_t err;
     config_init();
     ESP_LOGI(TAG, "Done loading config");
-    console_start();
-    network_init();
+    err = console_start();
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "console_start failed: %s", esp_err_to_name(err));
+    }
+
+    err = network_up();
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "network_up failed: %s", esp_err_to_name(err));
+    }
+
     err = webserver_start();
     if (err == ESP_OK)
     {
-        webserv_sys_init();
-        webserv_cam_init();
-        fota_init();
+        err = webserv_sys_init();
+        if (err != ESP_OK) ESP_LOGE(TAG, "webserv_sys_init failed: %s", esp_err_to_name(err));
+
+        err = webserv_cam_init();
+        if (err != ESP_OK) ESP_LOGE(TAG, "webserv_cam_init failed: %s", esp_err_to_name(err));
+
+        err = webserv_servo_init();
+        if (err != ESP_OK) ESP_LOGE(TAG, "webserv_servo_init failed: %s", esp_err_to_name(err));
+
+        err = fota_init();
+        if (err != ESP_OK) ESP_LOGE(TAG, "fota_init failed: %s", esp_err_to_name(err));
     }
 #if ESP_CAMERA_SUPPORTED
     err = camera_init();
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "camera_init failed: %s", esp_err_to_name(err));
+    }
 #else
     ESP_LOGE(TAG, "Camera support is not available for this chip");
 #endif
