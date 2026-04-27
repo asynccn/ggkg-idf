@@ -18,6 +18,10 @@ esp_err_t webserver_auth_req_basic(httpd_req_t *req, const char *user, const cha
 
 esp_err_t webserver_reg_uri_handle(httpd_uri_t *handle);
 
+esp_err_t webserver_reg_uri_handle_stream(httpd_uri_t *handle);
+
+uint16_t webserver_get_stream_port(void);
+
 esp_err_t webserver_start(void);
 
 esp_err_t webserver_stop(void);

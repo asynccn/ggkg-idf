@@ -23,14 +23,19 @@
 
 static const char *TAG = "webserver";
 
-#define AUTH_HEADER_LEN_MAX     100
-#define AUTH_RETRY_MAX          3
-#define AUTH_FAILED_COOLDOWN_MS 60000
+#define AUTH_HEADER_LEN_MAX 100
 
 static const char s_base64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 static httpd_handle_t httpd_handle_server = NULL;
+static httpd_handle_t httpd_handle_stream = NULL;
 static httpd_config_t httpd_config_server = HTTPD_DEFAULT_CONFIG();
+static httpd_config_t httpd_config_stream = HTTPD_DEFAULT_CONFIG();
+
+static uint16_t next_port_or_self(uint16_t port)
+{
+    return (port == UINT16_MAX) ? port : (uint16_t)(port + 1U);
+}
 
 static size_t base64_encoded_len(size_t src_len)
 {
@@ -182,11 +187,21 @@ esp_err_t webserver_reg_uri_handle(httpd_uri_t *handle)
     return httpd_register_uri_handler(httpd_handle_server, handle);
 }
 
+esp_err_t webserver_reg_uri_handle_stream(httpd_uri_t *handle)
+{
+    return httpd_register_uri_handler(httpd_handle_stream, handle);
+}
+
+uint16_t webserver_get_stream_port(void)
+{
+    return httpd_config_stream.server_port;
+}
+
 static esp_err_t handler_index(httpd_req_t *req)
 {
     httpd_resp_set_type(req, "text/html");
     httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
-    return httpd_resp_send(req, (const char *)index_ov2640_html_gz, index_ov2640_html_gz_len);
+    return httpd_resp_send(req, (const char *)index_html_gz, index_html_gz_len);
 }
 
 static esp_err_t handler_favicon(httpd_req_t *req)
@@ -199,14 +214,35 @@ static esp_err_t handler_favicon(httpd_req_t *req)
 esp_err_t webserver_start(void)
 {
     esp_err_t err = ESP_OK;
+
+    httpd_config_server = (httpd_config_t) HTTPD_DEFAULT_CONFIG();
+    httpd_config_stream = (httpd_config_t) HTTPD_DEFAULT_CONFIG();
+
     httpd_config_server.server_port = (cfg_wserver_port == 0U) ? 80U : cfg_wserver_port;
     httpd_config_server.max_open_sockets = 2;
-    ESP_LOGI(TAG, "starting on port %u", httpd_config_server.server_port);
+    httpd_config_server.max_uri_handlers = 24;
+
+    httpd_config_stream.server_port = next_port_or_self(httpd_config_server.server_port);
+    httpd_config_stream.ctrl_port = next_port_or_self(httpd_config_server.ctrl_port);
+    httpd_config_stream.max_open_sockets = 2;
+    httpd_config_stream.max_uri_handlers = 4;
+
+    ESP_LOGI(TAG, "starting ctrl server on port %u", httpd_config_server.server_port);
 
     err = httpd_start(&httpd_handle_server, &httpd_config_server);
     if (err != ESP_OK)
     {
-        ESP_LOGE(TAG, "start failed due to %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "ctrl server start failed due to %s", esp_err_to_name(err));
+        return err;
+    }
+
+    ESP_LOGI(TAG, "starting stream server on port %u", httpd_config_stream.server_port);
+    err = httpd_start(&httpd_handle_stream, &httpd_config_stream);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "stream server start failed due to %s", esp_err_to_name(err));
+        httpd_stop(httpd_handle_server);
+        httpd_handle_server = NULL;
         return err;
     }
 
@@ -242,7 +278,22 @@ esp_err_t webserver_start(void)
 esp_err_t webserver_stop(void)
 {
     esp_err_t err = ESP_OK;
-    err = httpd_stop(httpd_handle_server);
-    httpd_handle_server = NULL;
+
+    if (httpd_handle_server != NULL)
+    {
+        err = httpd_stop(httpd_handle_server);
+        httpd_handle_server = NULL;
+        if (err != ESP_OK)
+        {
+            return err;
+        }
+    }
+
+    if (httpd_handle_stream != NULL)
+    {
+        err = httpd_stop(httpd_handle_stream);
+        httpd_handle_stream = NULL;
+    }
+
     return err;
 }
