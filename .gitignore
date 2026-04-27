@@ -1,7 +1,8 @@
+.cursor
 .devcontainer
 .vscode
 build
 managed_components
 sdkconfig.*
 dependencies.lock
-.cursor
+main/htdocs.h
