@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>GGKG</title>
+<style>
+:root{color-scheme:light dark;--bg:#f6f7fb;--fg:#1a1d24;--muted:#7b8191;--d1:#26a69a;--d2:#1e8c83;--dg:rgba(38,166,154,.45);--po:rgba(0,0,0,.12);--a1:#ff3034;--a2:#f21c21;--ag:rgba(255,48,52,.55);--x1:#8d8d8d;--x2:#757575;--camh:45vh;--menu-head-bg:rgba(0,0,0,.14);--menu-body-bg:rgba(255,255,255,.32);--g-scale:1;--g-lower-offset:calc(2.8rem * var(--g-scale));--g-control-size:calc(2.2rem * var(--g-scale))}
+@media (prefers-color-scheme:dark){:root{--bg:#13161d;--fg:#edf1ff;--muted:#a8afc3;--d1:#2db9ac;--d2:#1f988d;--dg:rgba(45,185,172,.38);--po:rgba(0,0,0,.25);--a1:#ff4e54;--a2:#f22c31;--ag:rgba(255,78,84,.52);--x1:#666a74;--x2:#565a63;--menu-head-bg:rgba(0,0,0,.32);--menu-body-bg:rgba(255,255,255,.06)}}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);font-family:Arial,Helvetica,sans-serif}body{min-height:100vh}
+.left{position:relative;padding:.6rem .7rem .7rem;background:var(--bg)}
+.cam-wrap{position:relative;width:100%;max-width:100%;margin:0 auto;background:#000;display:flex;justify-content:center;align-items:flex-start;overflow:hidden}.cam-wrap.no-signal{aspect-ratio:4/3;width:min(100%,640px)}.no-signal-tip{position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:rgba(255,255,255,.78);font-size:1.05rem;pointer-events:none}.cam-wrap.no-signal .no-signal-tip{display:flex}.cam-wrap.no-signal #stream{opacity:0}
+#stream{display:block;width:min(100%,var(--stream-preview-max-width,100%));max-width:100%;height:auto;max-height:var(--camh);object-fit:contain;background:#000;margin:0 auto}
+#save-still{position:absolute;right:.5rem;top:.5rem;text-decoration:none;font-size:.88rem;padding:.5rem .7rem;border-radius:999px;color:#fff;opacity:.78;background:linear-gradient(180deg,#4f72ff,#3553d8);transition:.18s}
+#save-still:hover{opacity:.92;box-shadow:0 0 .8rem rgba(79,114,255,.4)}#save-still:active{transform:translateY(1px)}
+.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;margin-top:.65rem}.desktop-only{display:none}
+button{border:1px solid rgba(127,127,127,.38);border-radius:.6rem;height:2.2rem;color:#fff;background:linear-gradient(180deg,var(--d1),var(--d2));cursor:pointer;transition:.18s}
+button:hover{box-shadow:0 0 1rem var(--dg);filter:saturate(1.06) brightness(1.03)}
+button:active{transform:translateY(1px);box-shadow:0 0 .4rem var(--dg),inset 0 0 0 100vmax var(--po)}
+button[disabled],button.disabled{background:linear-gradient(180deg,var(--x1),var(--x2));color:#e9e9e9;cursor:not-allowed;box-shadow:none;filter:none;transform:none}
+#toggle-stream.stream-active{background:linear-gradient(180deg,var(--a1),var(--a2))}
+#toggle-stream.stream-active:hover{box-shadow:0 0 1rem var(--ag);filter:saturate(1.08) brightness(1.04)}
+.menu{padding:.6rem .9rem 2rem}
+.menu-group{margin:0}
+.menu-group+.menu-group{margin-top:.7rem}
+.menu-group-head{position:relative;display:flex;align-items:center;min-height:2.15rem;padding:.35rem .55rem .35rem 2.35rem;background:var(--menu-head-bg)}
+.menu-group-title{font-size:.95rem;font-weight:600;color:var(--fg)}
+.menu-group-toggle{position:absolute;left:0;top:0;width:2.2rem;height:100%;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;filter:none;transform:none;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.menu-group-toggle:hover{background:transparent;box-shadow:none;filter:none}
+.menu-group-toggle:active{background:transparent;box-shadow:none;filter:none;transform:none}
+.menu-group-toggle svg{width:.95rem;height:.95rem;display:block;transform-origin:50% 50%;transform:rotate(var(--arrow-rotate,180deg)) scale(var(--arrow-scale,.88));transition:transform .18s ease}
+.menu-group-toggle use{fill:#5f6878}
+.menu-group.collapsed .menu-group-toggle{--arrow-rotate:90deg}
+.menu-group:not(.collapsed) .menu-group-toggle{--arrow-rotate:180deg}
+.menu-group-body{padding:.45rem .55rem .55rem;background:var(--menu-body-bg)}
+#gimbal-menu-group>.menu-group-body{padding-top:2rem}
+.menu-group.collapsed .menu-group-body{display:none}
+.menu-item{display:flex;align-items:center;justify-content:space-between;gap:.7rem;min-height:2rem;padding:.2rem 0}
+.menu-item-label{color:var(--muted);font-size:.9rem}
+.menu-item-control{display:flex;align-items:center;justify-content:flex-end;min-width:0;flex:1;gap:.35rem;flex-wrap:wrap}
+.menu-item-control select,.menu-item-control input[type='text']{border-radius:.45rem;border:1px solid rgba(127,127,127,.4);background:transparent;color:inherit;padding:.2rem .42rem;height:2rem;min-width:7.2rem;max-width:100%}
+.menu-item-control input[type='range']{width:min(16rem,52vw);max-width:100%}
+.menu-item-control input[type='checkbox']{width:1.1rem;height:1.1rem}
+.menu-inline-btn{height:2rem;padding:0 .55rem;border-radius:.5rem}
+.menu-range{color:var(--muted);font-size:.82rem;white-space:nowrap}
+.is-hidden{display:none !important}
+.about-brand{display:flex;align-items:stretch;justify-content:center;gap:.7rem;min-height:64px;width:fit-content;max-width:100%;margin:1rem auto 1.1rem}
+.about-icon{width:64px;height:64px;max-width:64px;max-height:64px;display:block;object-fit:contain;flex:0 0 64px}
+.about-name-wrap{display:flex;flex-direction:column;justify-content:flex-start;height:64px}
+.about-name{height:32px;line-height:32px;font-size:1.12rem;font-weight:700}
+.about-full{height:32px;line-height:32px;font-size:1rem;color:var(--muted)}
+.about-detail{margin:.6rem 0 0;line-height:1.5}
+.menu-group .gimbal-item{margin:0}
+.menu-group .gimbal-head{display:none}
+.status.has-gimbal .menu-group{width:100%;background:transparent}
+.status.has-gimbal .menu-group-body{padding:0;background:transparent}
+.status.has-gimbal .menu-group-head{display:none}
+.status.has-gimbal .menu-group .gimbal-head{display:none}
+.status{display:none}
+.status.has-gimbal{min-height:250px;align-items:stretch}
+.status.has-gimbal #gimbal-status-slot{width:100%}
+.status.has-gimbal #status-placeholder{display:none !important}
+.gimbal-item{margin:0 0 .9rem}.gimbal-head{font-size:.95rem;color:var(--muted);margin:.1rem 0 .35rem}
+.gimbal{position:relative;min-height:calc((190px + 78px) * var(--g-scale))}
+.gimbal-item.hide-aux .gimbal{min-height:calc(190px * var(--g-scale))}
+.gimbal-item.hide-values .g-values{display:none}
+.gimbal-item.hide-aux .yaw-wrap,.gimbal-item.hide-aux .pitch-wrap,.gimbal-item.hide-aux .g-reset{display:none}
+.g-core{position:absolute;left:50%;top:0;transform:translateX(-50%);width:calc(190px * var(--g-scale));height:calc(190px * var(--g-scale));display:block}
+.pad{position:absolute;left:0;top:0;width:calc(190px * var(--g-scale));height:calc(190px * var(--g-scale));border-radius:50%;background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.08),rgba(0,0,0,.14));box-shadow:inset 0 0 0 1px rgba(127,127,127,.26);overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.pad.press-up::before,.pad.press-right::before,.pad.press-down::before,.pad.press-left::before{background:linear-gradient(45deg,transparent calc(50% - 1px),rgba(127,127,127,.26) calc(50% - 1px) calc(50% + 1px),transparent calc(50% + 1px)),linear-gradient(-45deg,transparent calc(50% - 1px),rgba(127,127,127,.26) calc(50% - 1px) calc(50% + 1px),transparent calc(50% + 1px)),var(--pad-press)}
+.pad.press-up{--pad-press:conic-gradient(from -45deg,rgba(0,0,0,.28) 0 25%,transparent 0 100%)}
+.pad.press-right{--pad-press:conic-gradient(from 45deg,rgba(0,0,0,.28) 0 25%,transparent 0 100%)}
+.pad.press-down{--pad-press:conic-gradient(from 135deg,rgba(0,0,0,.28) 0 25%,transparent 0 100%)}
+.pad.press-left{--pad-press:conic-gradient(from 225deg,rgba(0,0,0,.28) 0 25%,transparent 0 100%)}
+.pad::before{content:"";position:absolute;inset:0;background:linear-gradient(45deg,transparent calc(50% - 1px),rgba(127,127,127,.26) calc(50% - 1px) calc(50% + 1px),transparent calc(50% + 1px)),linear-gradient(-45deg,transparent calc(50% - 1px),rgba(127,127,127,.26) calc(50% - 1px) calc(50% + 1px),transparent calc(50% + 1px));-webkit-mask:radial-gradient(circle,transparent 0 30%,#000 30% 100%);mask:radial-gradient(circle,transparent 0 30%,#000 30% 100%);pointer-events:none;z-index:4}
+.pad.dragging::before{background:none}
+.pad.dragging .pad-arrows{display:none}
+.pad-handle{position:absolute;left:50%;top:50%;width:calc(82px * var(--g-scale));height:calc(82px * var(--g-scale));transform:translate(-50%,-50%);border-radius:50%;box-sizing:border-box;background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.08),rgba(0,0,0,.14));border:1px solid rgba(127,127,127,.26);z-index:6;cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.pad.dragging .pad-handle{cursor:grabbing}
+.pad::after{content:none}
+.pad button{position:absolute;inset:0;border:0;border-radius:0;padding:0;margin:0;background:transparent;box-shadow:none;transform:none;filter:none;z-index:2;cursor:pointer;pointer-events:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.pad button:hover{box-shadow:none;background:transparent}
+.pad button:active{box-shadow:none;transform:none;background:transparent}
+.pad .up,.pad .right,.pad .down,.pad .left{background:transparent;clip-path:none;-webkit-mask:none;mask:none}
+.pad .up::after,.pad .right::after,.pad .down::after,.pad .left::after{content:none}
+.pad-arrows{position:absolute;inset:0;pointer-events:none;z-index:10}
+.pad-arrows svg{position:absolute;width:calc(22px * var(--g-scale));height:calc(22px * var(--g-scale));transform:translate(-50%,-50%) rotate(var(--arrow-rotate,0deg)) scale(var(--arrow-scale,1));transform-origin:50% 50%}
+.pad-arrows use{fill:#5f6878}
+.pad-arrows .a-up{left:50%;top:16%;--arrow-rotate:0deg}
+.pad-arrows .a-right{left:84%;top:50%;--arrow-rotate:90deg}
+.pad-arrows .a-down{left:50%;top:84%;--arrow-rotate:180deg}
+.pad-arrows .a-left{left:16%;top:50%;--arrow-rotate:-90deg}
+.yaw-wrap{position:absolute;left:0;bottom:calc(-1 * var(--g-lower-offset));width:calc(190px * var(--g-scale));height:var(--g-control-size);display:flex;align-items:center}
+.yaw-wrap input{width:100%;height:100%}
+.pitch-wrap{position:absolute;left:calc(100% + .55rem * var(--g-scale));top:0;height:calc(190px * var(--g-scale));display:flex;align-items:center;justify-content:center;overflow:visible}
+.pitch-wrap input{writing-mode:vertical-lr;appearance:slider-vertical;-webkit-appearance:slider-vertical;width:calc(2.2rem * var(--g-scale));height:100%}
+.g-reset{position:absolute;left:calc(100% + 1.65rem * var(--g-scale));transform:translateX(-50%);bottom:calc(-1 * var(--g-lower-offset));width:var(--g-control-size);height:var(--g-control-size);padding:0;border-radius:999px;border:1px solid rgba(127,127,127,.26);background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.08),rgba(0,0,0,.14));color:#5f6878;display:flex;align-items:center;justify-content:center;font-size:calc(1.05rem * var(--g-scale));line-height:1;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+.g-reset:hover{box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);filter:none}
+.g-reset span{display:block}
+.g-values{position:absolute;right:0;top:0;transform:none;display:grid;grid-template-columns:1fr;grid-template-rows:auto auto auto auto;gap:.35rem;align-content:space-between;justify-items:stretch;font-size:.88rem;color:var(--muted)}
+.g-values label{display:block;margin-top:.2rem}
+.g-values input{width:100%;height:2.05rem;border-radius:.45rem;border:1px solid rgba(127,127,127,.45);background:transparent;color:inherit;padding:0 .35rem}
+#g-yaw-num,#g-pitch-num{width:8.5ch;min-width:8.5ch;text-align:right}
+.g-tip{position:absolute;opacity:0;pointer-events:none;background:rgba(0,0,0,.72);color:#fff;border-radius:.35rem;padding:.18rem .36rem;font-size:.75rem;transform:translateY(-4px);transition:opacity .15s ease}
+.yaw-wrap:hover .g-tip,.pitch-wrap:hover .g-tip{opacity:1}
+.yaw-wrap .g-tip{left:0;top:-1.35rem}
+.pitch-wrap .g-tip{left:50%;top:-1.35rem;transform:translateX(-50%)}
+@media (max-width:819px){html,body{height:100vh;overflow:hidden}.app{height:100vh;display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden}.left{position:relative;z-index:2;padding:.7rem;background:var(--bg)}.menu{overflow-y:auto;overflow-x:hidden;min-height:0;padding:.3rem .9rem 1rem}.gimbal{column-gap:.45rem}html.stack-scroll,html.stack-scroll body{height:auto;overflow:auto}html.stack-scroll .app{height:auto;display:block;overflow:visible}html.stack-scroll .menu{overflow:visible;min-height:auto;max-height:none}}
+@media (max-width:420px){.gimbal{column-gap:.35rem}}
+@media (min-width:820px){html,body{height:100vh;overflow:hidden}.app{display:grid;grid-template-columns:minmax(360px,42vw) 1fr;height:calc(100vh - 3.2rem)}.left{height:calc(100vh - 3.2rem);display:flex;flex-direction:column;overflow:hidden}.cam-region{display:flex;flex-direction:column}.cam-wrap{margin:0;width:100%;display:flex;justify-content:center;align-items:flex-start}.cam-wrap.no-signal{display:block;width:min(100%,640px)}#stream{width:min(100%,var(--stream-preview-max-width,100%));height:auto;max-width:100%;max-height:calc(100vh - 15rem)}.controls{grid-template-columns:repeat(4,minmax(0,1fr))}.desktop-only{display:inline-block}.menu{overflow:auto;height:calc(100vh - 3.2rem)}.status{display:flex;margin-top:.65rem;color:var(--muted);min-height:6rem;align-items:flex-start;justify-content:flex-start;text-align:left}}
+</style>
+</head>
+<body>
+<main class="app">
+<section class="left" id="left-pane">
+<div class="cam-region" id="camera-region">
+<figure class="cam-wrap no-signal" id="stream-container">
+<img id="stream" src="" alt="Camera stream" />
+<div class="no-signal-tip" data-i18n="noSignal">No signal</div>
+<a id="save-still" href="#" download="capture.jpg" data-i18n="save">Save</a>
+</figure>
+<section class="controls" id="controls">
+<button id="get-still" data-i18n="capture">Capture</button>
+<button id="toggle-stream" data-i18n="startStream">Start Stream</button>
+<button id="face_enroll" class="desktop-only disabled" disabled data-i18n="enrollFace">Enroll Face</button>
+<button id="reset-camera" class="desktop-only" data-i18n="reset">Reset</button>
+</section>
+</div>
+<div class="status" id="status-box"><div id="gimbal-status-slot"></div><div class="status-placeholder" id="status-placeholder">Status info</div></div>
+</section>
+<aside class="menu">
+<section class="menu-group" id="gimbal-menu-group">
+  <div class="menu-group-head">
+    <div class="menu-group-title" data-i18n="gimbal">Gimbal</div>
+    <button id="gimbal-menu-toggle" class="menu-group-toggle" type="button" aria-expanded="true" title="Collapse" aria-label="Collapse">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-arrow-up"></use></svg>
+    </button>
+  </div>
+  <div class="menu-group-body" id="gimbal-menu-slot"></div>
+</section>
+<section class="menu-group" id="imgset-menu-group">
+  <div class="menu-group-head">
+    <div class="menu-group-title">图像设置</div>
+    <button id="imgset-menu-toggle" class="menu-group-toggle" type="button" aria-expanded="false" title="Expand" aria-label="Expand"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-arrow-up"></use></svg></button>
+  </div>
+  <div class="menu-group-body">
+    <div class="menu-item"><label class="menu-item-label" for="framesize">分辨率</label><div class="menu-item-control"><select id="framesize" data-var="framesize"><option value="24">5MP(2592x1944)</option><option value="23">QSXGA(2560x1920)</option><option value="22">P_FHD(1080x1920)</option><option value="21">WQXGA(2560x1600)</option><option value="20">QHD(2560x1440)</option><option value="19">QXGA(2048x1536)</option><option value="18">P_3MP(864x1536)</option><option value="17">P_HD(720x1280)</option><option value="16">FHD(1920x1080)</option><option value="15">UXGA(1600x1200)</option><option value="14">SXGA(1280x1024)</option><option value="13">HD(1280x720)</option><option value="12">XGA(1024x768)</option><option value="11">SVGA(800x600)</option><option value="10" selected>VGA(640x480)</option><option value="9">HVGA(480x320)</option><option value="8">CIF(400x296)</option><option value="7">320x320</option><option value="6">QVGA(320x240)</option><option value="5">240x240</option><option value="4">HQVGA(240x176)</option><option value="3">QCIF(176x144)</option><option value="2">128x128</option><option value="1">QQVGA(160x120)</option><option value="0">96x96</option></select></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="quality">质量</label><div class="menu-item-control"><span class="menu-range">(4 ~ 63)</span><input id="quality" data-var="quality" type="range" min="4" max="63" value="10"/></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="brightness">亮度</label><div class="menu-item-control"><span class="menu-range">(-2 ~ 2)</span><input id="brightness" data-var="brightness" type="range" min="-2" max="2" value="0"/></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="contrast">对比度</label><div class="menu-item-control"><span class="menu-range">(-2 ~ 2)</span><input id="contrast" data-var="contrast" type="range" min="-2" max="2" value="0"/></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="saturation">饱和度</label><div class="menu-item-control"><span class="menu-range">(-2 ~ 2)</span><input id="saturation" data-var="saturation" type="range" min="-2" max="2" value="0"/></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="sharpness">锐度</label><div class="menu-item-control"><span class="menu-range">(-2 ~ 2)</span><input id="sharpness" data-var="sharpness" type="range" min="-2" max="2" value="0"/></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="special_effect">特效</label><div class="menu-item-control"><select id="special_effect" data-var="special_effect"><option value="0">无</option><option value="1">负片</option><option value="2">灰度</option><option value="3">红色调</option><option value="4">绿色调</option><option value="5">蓝色调</option><option value="6">棕褐色</option></select></div></div>
+  </div>
+</section>
+<section class="menu-group" id="imgadj-menu-group">
+  <div class="menu-group-head"><div class="menu-group-title">图像校正</div><button id="imgadj-menu-toggle" class="menu-group-toggle" type="button" aria-expanded="false" title="Expand" aria-label="Expand"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-arrow-up"></use></svg></button></div>
+  <div class="menu-group-body">
+    <div class="menu-item"><label class="menu-item-label" for="lenc">镜头校正</label><div class="menu-item-control"><input id="lenc" data-var="lenc" type="checkbox"/></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="hmirror">水平镜像</label><div class="menu-item-control"><input id="hmirror" data-var="hmirror" type="checkbox"/></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="vflip">垂直翻转</label><div class="menu-item-control"><input id="vflip" data-var="vflip" type="checkbox"/></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="dcw">降采样</label><div class="menu-item-control"><input id="dcw" data-var="dcw" type="checkbox"/></div></div>
+  </div>
+</section>
+<section class="menu-group" id="camsensor-menu-group">
+  <div class="menu-group-head"><div class="menu-group-title">相机参数</div><button id="camsensor-menu-toggle" class="menu-group-toggle" type="button" aria-expanded="false" title="Expand" aria-label="Expand"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-arrow-up"></use></svg></button></div>
+  <div class="menu-group-body">
+    <div class="menu-item"><label class="menu-item-label" for="awb">自动白平衡</label><div class="menu-item-control"><input id="awb" data-var="awb" type="checkbox"/></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="awb_gain">白平衡增益</label><div class="menu-item-control"><input id="awb_gain" data-var="awb_gain" type="checkbox"/></div></div>
+    <div class="menu-item" id="wb-mode-row"><label class="menu-item-label" for="wb_mode">白平衡模式</label><div class="menu-item-control"><select id="wb_mode" data-var="wb_mode"><option value="0">自动</option><option value="1">晴天</option><option value="2">阴天</option><option value="3">办公室</option><option value="4">家用</option></select></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="aec">自动曝光传感器</label><div class="menu-item-control"><input id="aec" data-var="aec" type="checkbox"/></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="aec2">自动曝光DSP</label><div class="menu-item-control"><input id="aec2" data-var="aec2" type="checkbox"/></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="ae_level">曝光级别</label><div class="menu-item-control"><span class="menu-range">(-2 ~ 2)</span><input id="ae_level" data-var="ae_level" type="range" min="-2" max="2" value="0"/></div></div>
+    <div class="menu-item" id="aec-value-row"><label class="menu-item-label" for="aec_value">曝光值</label><div class="menu-item-control"><span class="menu-range">(0 ~ 1200)</span><input id="aec_value" data-var="aec_value" type="range" min="0" max="1200" value="204"/></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="agc">自动增益</label><div class="menu-item-control"><input id="agc" data-var="agc" type="checkbox"/></div></div>
+    <div class="menu-item is-hidden" id="agc-gain-row"><label class="menu-item-label" for="agc_gain">增益</label><div class="menu-item-control"><span class="menu-range">(0 ~ 30)</span><input id="agc_gain" data-var="agc_gain" type="range" min="0" max="30" value="5"/></div></div>
+    <div class="menu-item" id="gainceiling-row"><label class="menu-item-label" for="gainceiling">增益上限</label><div class="menu-item-control"><span class="menu-range">(0 ~ 6)</span><input id="gainceiling" data-var="gainceiling" type="range" min="0" max="6" value="0"/></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="bpc">坏点校正</label><div class="menu-item-control"><input id="bpc" data-var="bpc" type="checkbox"/></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="wpc">白点校正</label><div class="menu-item-control"><input id="wpc" data-var="wpc" type="checkbox"/></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="raw_gma">RAW伽马</label><div class="menu-item-control"><input id="raw_gma" data-var="raw_gma" type="checkbox"/></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="colorbar">彩条测试</label><div class="menu-item-control"><input id="colorbar" data-var="colorbar" type="checkbox"/></div></div>
+  </div>
+</section>
+<section class="menu-group" id="adv-menu-group">
+  <div class="menu-group-head"><div class="menu-group-title">高级功能</div><button id="adv-menu-toggle" class="menu-group-toggle" type="button" aria-expanded="false" title="Expand" aria-label="Expand"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-arrow-up"></use></svg></button></div>
+  <div class="menu-group-body">
+    <div class="menu-item"><label class="menu-item-label" for="xclk-text">XCLK MHz</label><div class="menu-item-control"><span class="menu-range">(1 ~ 20)</span><input id="xclk-text" type="text" value="20"/><button id="set-xclk" class="menu-inline-btn" type="button">Set</button></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="reg-addr">寄存器写入</label><div class="menu-item-control"><input id="reg-addr" type="text" value="0x111"/><input id="reg-mask" type="text" value="0x80"/><input id="reg-value" type="text" value="0x80"/><button id="set-reg" class="menu-inline-btn" type="button">Set</button></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="get-reg-addr">寄存器读取</label><div class="menu-item-control"><input id="get-reg-addr" type="text" value="0x111"/><input id="get-reg-mask" type="text" value="0x80"/><button id="get-reg" class="menu-inline-btn" type="button">Get</button></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="get-reg-value">读取结果</label><div class="menu-item-control"><span id="get-reg-value">-</span></div></div>
+    <div class="menu-item"><label class="menu-item-label" for="pll-bypass">PLL参数</label><div class="menu-item-control"><input id="pll-bypass" type="text" value="0"/><input id="pll-mul" type="text" value="8"/><input id="pll-sys" type="text" value="1"/><input id="pll-root" type="text" value="0"/><input id="pll-pre" type="text" value="0"/><input id="pll-seld5" type="text" value="0"/><input id="pll-pclken" type="text" value="1"/><input id="pll-pclk" type="text" value="4"/><button id="set-pll" class="menu-inline-btn" type="button">Set</button></div></div>
+  </div>
+</section>
+<section class="menu-group" id="ui-menu-group">
+  <div class="menu-group-head">
+    <div class="menu-group-title" data-i18n="uiSettings">Interface Settings</div>
+    <button id="ui-menu-toggle" class="menu-group-toggle" type="button" aria-expanded="true" title="Collapse" aria-label="Collapse">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-arrow-up"></use></svg>
+    </button>
+  </div>
+  <div class="menu-group-body" id="ui-menu-body">
+    <div class="menu-item">
+      <label class="menu-item-label" for="theme-select" data-i18n="theme">Theme</label>
+      <div class="menu-item-control">
+        <select id="theme-select"><option value="auto">Auto</option><option value="light">Light</option><option value="dark">Dark</option></select>
+      </div>
+    </div>
+    <div class="menu-item">
+      <label class="menu-item-label" for="lang-select" data-i18n="language">Language</label>
+      <div class="menu-item-control">
+        <select id="lang-select"><option value="auto">Auto</option><option value="en-US">English (US)</option><option value="zh-CN">简体中文（中国大陆）</option><option value="zh-HK">繁體中文（香港）</option></select>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="menu-group" id="about-menu-group">
+  <div class="menu-group-head">
+    <div class="menu-group-title" data-i18n="about">About</div>
+    <button id="about-menu-toggle" class="menu-group-toggle" type="button" aria-expanded="false" title="Expand" aria-label="Expand">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-arrow-up"></use></svg>
+    </button>
+  </div>
+  <div class="menu-group-body" id="about-menu-body">
+    <div class="about-brand">
+      <img class="about-icon" src="/favicon.ico" alt="GGKG icon" />
+      <div class="about-name-wrap">
+        <div class="about-name">GGKG</div>
+        <div class="about-full">GG & kontornl Gimbal</div>
+      </div>
+    </div>
+    <p class="about-detail">详细信息</p>
+  </div>
+</section>
+</aside>
+</main>
+<section id="gimbal-panel" class="gimbal-item">
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute;left:-9999px;overflow:hidden">
+    <defs>
+      <symbol id="icon-arrow-up" viewBox="0 0 24 24">
+        <path d="M12 4 L20 18 L4 18 Z"></path>
+      </symbol>
+    </defs>
+  </svg>
+  <div class="gimbal-head" data-i18n="gimbal">Gimbal</div>
+  <div class="gimbal">
+    <div class="g-core">
+      <div class="pad">
+        <button class="up" id="g-up" title="Up" aria-label="Up"></button>
+        <button class="left" id="g-left" title="Left" aria-label="Left"></button>
+        <button class="right" id="g-right" title="Right" aria-label="Right"></button>
+        <button class="down" id="g-down" title="Down" aria-label="Down"></button>
+        <div class="pad-handle" id="g-handle" aria-label="Gimbal handle"></div>
+        <div class="pad-arrows" aria-hidden="true">
+          <svg class="a-up" viewBox="0 0 24 24"><use href="#icon-arrow-up"></use></svg>
+          <svg class="a-right" viewBox="0 0 24 24"><use href="#icon-arrow-up"></use></svg>
+          <svg class="a-down" viewBox="0 0 24 24"><use href="#icon-arrow-up"></use></svg>
+          <svg class="a-left" viewBox="0 0 24 24"><use href="#icon-arrow-up"></use></svg>
+        </div>
+      </div>
+      <div class="yaw-wrap">
+        <span class="g-tip" data-i18n="yaw">Yaw</span>
+        <input id="g-yaw" type="range" min="-90" max="90" step="0.1" value="0" />
+      </div>
+      <div class="pitch-wrap">
+        <span class="g-tip" data-i18n="pitch">Pitch</span>
+        <input id="g-pitch" type="range" min="-90" max="90" step="0.1" value="0" />
+      </div>
+      <button id="g-reset" class="g-reset" title="Reset"><span>⟳</span></button>
+    </div>
+    <div class="g-values">
+      <label for="g-yaw-num" data-i18n="yaw">Yaw</label>
+      <input id="g-yaw-num" type="number" min="-90" max="90" step="0.1" value="0" />
+      <label for="g-pitch-num" data-i18n="pitch">Pitch</label>
+      <input id="g-pitch-num" type="number" min="-90" max="90" step="0.1" value="0" />
+    </div>
+  </div>
+</section>
+<script>
+(()=>{const baseHost=document.location.origin;const streamHost=(()=>{try{const u=new URL(baseHost);const p=u.port?Number(u.port):((u.protocol==='https:')?443:80);const sp=Math.min(65535,p+1);u.port=String(sp);return u.origin;}catch(_){return baseHost;}})();const I18N={'en-US':{theme:'Theme',language:'Language',uiSettings:'Interface Settings',about:'About',save:'Save',capture:'Capture',startStream:'Start Stream',stopStream:'Stop Stream',enrollFace:'Enroll Face',reset:'Reset',noSignal:'No signal',gimbal:'Gimbal',yaw:'Yaw',pitch:'Pitch',up:'Up',down:'Down',left:'Left',right:'Right',expand:'Expand',collapse:'Collapse'},'zh-CN':{theme:'主题',language:'语言',uiSettings:'界面设置',about:'关于',save:'保存',capture:'抓拍',startStream:'开启视频流',stopStream:'停止视频流',enrollFace:'录入人脸',reset:'重置',noSignal:'无信号',gimbal:'云台控制',yaw:'偏航',pitch:'俯仰',up:'上',down:'下',left:'左',right:'右',expand:'展开',collapse:'折叠'},'zh-HK':{theme:'主題',language:'語言',uiSettings:'介面設定',about:'關於',save:'儲存',capture:'抓拍',startStream:'開啟串流',stopStream:'停止串流',enrollFace:'登錄人臉',reset:'重設',noSignal:'無訊號',gimbal:'雲台控制',yaw:'偏航',pitch:'俯仰',up:'上',down:'下',left:'左',right:'右',expand:'展開',collapse:'摺疊'}};
+const themeSelect=document.getElementById('theme-select'),langSelect=document.getElementById('lang-select'),view=document.getElementById('stream'),streamContainer=document.getElementById('stream-container'),cameraRegion=document.getElementById('camera-region'),stillButton=document.getElementById('get-still'),streamButton=document.getElementById('toggle-stream'),enrollButton=document.getElementById('face_enroll'),resetButton=document.getElementById('reset-camera'),saveButton=document.getElementById('save-still'),framesize=document.getElementById('framesize');
+const gimbalPanel=document.getElementById('gimbal-panel'),gimbalMenuGroup=document.getElementById('gimbal-menu-group'),gimbalMenuSlot=document.getElementById('gimbal-menu-slot'),gimbalMenuToggle=document.getElementById('gimbal-menu-toggle'),uiMenuGroup=document.getElementById('ui-menu-group'),uiMenuToggle=document.getElementById('ui-menu-toggle'),aboutMenuGroup=document.getElementById('about-menu-group'),aboutMenuToggle=document.getElementById('about-menu-toggle'),gimbalStatusSlot=document.getElementById('gimbal-status-slot'),statusBox=document.getElementById('status-box'),statusPlaceholder=document.getElementById('status-placeholder');
+const gYaw=document.getElementById('g-yaw'),gPitch=document.getElementById('g-pitch'),gYawNum=document.getElementById('g-yaw-num'),gPitchNum=document.getElementById('g-pitch-num');
+const gPad=document.querySelector('.pad'),gHandle=document.getElementById('g-handle');
+const padPressClasses=['press-up','press-right','press-down','press-left'];
+let streamActive=false,padHoldDelayTimer=0,padHoldTimer=0,padHoldDir='',padLongPressActive=false,gHandleDragging=false,gHandleVector={x:0,y:0},saveObjectUrl='',sysHostname='';
+let frameWidth=0,frameHeight=0,currentImageMode='idle',currentCamModel='UNKNOWN';
+let gimbalMenuCollapsed=false,uiMenuCollapsed=true,aboutMenuCollapsed=true;
+const GIMBAL_MENU_COLLAPSE_KEY='ggkgGimbalMenuCollapsed',UI_MENU_COLLAPSE_KEY='ggkgUiMenuCollapsed',ABOUT_MENU_COLLAPSE_KEY='ggkgAboutMenuCollapsed';
+let streamHasFrame=false,isStreamStarting=false,isStreamSwitching=false,isCapturePending=false,streamStartWatchdogTimer=0,streamStartRetries=0,capturePendingTimer=0;
+const STREAM_START_TIMEOUT_MS=4000,STREAM_MAX_RETRIES=2;
+const MIN_MENU_VISIBLE_ROWS=6;
+const CAM_CAPTURE_PATH='/cam/capture',CAM_STREAM_PATH='/cam/stream',CAM_CONTROL_PATH='/cam/control';
+const MODEL_MAX_FRAMESIZE={OV2640:15,OV3660:19,OV5640:24};
+const uaLocale=()=>{const x=(navigator.language||'en-US').toLowerCase();if(x.startsWith('zh-cn')||x.startsWith('zh-sg'))return'zh-CN';if(x.startsWith('zh-hk')||x.startsWith('zh-tw')||x.startsWith('zh-mo'))return'zh-HK';return'en-US'};
+const iso8601Local=(d)=>{const p=(n)=>String(n).padStart(2,'0');const y=d.getFullYear(),m=p(d.getMonth()+1),day=p(d.getDate()),h=p(d.getHours()),mi=p(d.getMinutes()),s=p(d.getSeconds());const tz=-d.getTimezoneOffset(),sign=tz>=0?'+':'-',oh=p(Math.floor(Math.abs(tz)/60)),om=p(Math.abs(tz)%60);return `${y}${m}${day}T${h}${mi}${s}${sign}${oh}${om}`};
+const fetchSysHostname=()=>fetch(`${baseHost}/sys/hostname`).then(r=>r.ok?r.text():'').then(t=>{const h=(t||'').trim();if(!h) return '';sysHostname=h;document.title=`GGKG (${h})`;return h;}).catch(()=> '');
+const currentDict=()=>{const m=langSelect.value,e=m==='auto'?uaLocale():m;return I18N[e]||I18N['en-US']};
+const setControlValue=(el,val)=>{if(val===undefined||val===null)return;if(el.type==='checkbox'){el.checked=!!Number(val);}else{el.value=String(val);}if(el.id==='aec'){document.getElementById('aec-value-row')?.classList.toggle('is-hidden',!!Number(val));}if(el.id==='agc'){const on=!!Number(val);document.getElementById('agc-gain-row')?.classList.toggle('is-hidden',on);document.getElementById('gainceiling-row')?.classList.toggle('is-hidden',!on);}if(el.id==='awb_gain'){document.getElementById('wb-mode-row')?.classList.toggle('is-hidden',!Number(val));}};
+const normalizeFramesizeSelection=()=>{const selected=framesize.options[framesize.selectedIndex];if(selected&&!selected.hidden)return;const fallback=[...framesize.options].find(opt=>!opt.hidden);if(fallback)framesize.value=fallback.value;};
+const applyModelCapabilities=(model)=>{const modelKey=String(model||'UNKNOWN').toUpperCase();currentCamModel=modelKey;const maxFrame=Object.prototype.hasOwnProperty.call(MODEL_MAX_FRAMESIZE,modelKey)?MODEL_MAX_FRAMESIZE[modelKey]:15;[...framesize.options].forEach(opt=>{const v=Number(opt.value);opt.hidden=Number.isFinite(v)&&v>maxFrame;});normalizeFramesizeSelection();};
+const updateControlFromResponse=(el,data)=>{if(!data||typeof data!=='object')return;const key=el?.dataset?.var;if(!key)return;if(Object.prototype.hasOwnProperty.call(data,key)){setControlValue(el,data[key]);return;}if(data.val!==undefined)setControlValue(el,data.val);};
+const refreshCamStatus=()=>fetch(`${baseHost}/cam/status`).then(r=>r.ok?r.json():null).catch(()=>null);
+const refreshMenuGroupState=(groupName)=>{if(groupName==='ui'||groupName==='about')return Promise.resolve();if(groupName==='gimbal')return servoRefresh();if(groupName==='adv')return Promise.resolve();const group=document.getElementById(`${groupName}-menu-group`);if(!group)return Promise.resolve();const controls=[...group.querySelectorAll('[data-var]')];if(!controls.length)return Promise.resolve();return refreshCamStatus().then(st=>{if(!st)return;if(st.model!==undefined)applyModelCapabilities(st.model);controls.forEach(el=>{const key=el.dataset.var;if(Object.prototype.hasOwnProperty.call(st,key))setControlValue(el,st[key]);});});};
+const sendCamControl=(el)=>{const key=el?.dataset?.var;if(!key)return Promise.resolve();const value=el.type==='checkbox'?(el.checked?1:0):el.value;return fetch(`${baseHost}/cam/control?var=${encodeURIComponent(key)}&val=${encodeURIComponent(value)}`).then(async r=>{const txt=await r.text();let data=null;try{data=JSON.parse(txt);}catch(_){ }if(r.ok&&data)updateControlFromResponse(el,data);}).catch(()=>{});};
+const bindMenuControlEvents=()=>{document.querySelectorAll('[data-var]').forEach(el=>{if(el.dataset.bound==='1')return;el.dataset.bound='1';const handler=()=>sendCamControl(el);if(el.tagName==='SELECT'||el.type==='checkbox')el.addEventListener('change',handler);else if(el.type==='range')el.addEventListener('change',handler);else if(el.tagName==='BUTTON')el.addEventListener('click',handler);else el.addEventListener('change',handler);});
+const bindButtonRequest=(id,url,beforeSend)=>{const el=document.getElementById(id);if(!el||el.dataset.bound==='1')return;el.dataset.bound='1';el.addEventListener('click',()=>{const q=beforeSend?beforeSend():'';fetch(`${baseHost}${url}${q}`).then(async r=>{if(!r.ok)return;const txt=await r.text();try{const data=JSON.parse(txt);if(id==='get-reg'&&data&&data.value!==undefined)document.getElementById('get-reg-value').textContent=String(data.value);}catch(_){}}).catch(()=>{});});};
+bindButtonRequest('set-xclk','/cam/xclk',()=>`?xclk=${encodeURIComponent(document.getElementById('xclk-text')?.value||'')}`);
+bindButtonRequest('set-reg','/cam/reg',()=>`?reg=${encodeURIComponent(document.getElementById('reg-addr')?.value||'')}&mask=${encodeURIComponent(document.getElementById('reg-mask')?.value||'')}&val=${encodeURIComponent(document.getElementById('reg-value')?.value||'')}`);
+bindButtonRequest('get-reg','/cam/greg',()=>`?reg=${encodeURIComponent(document.getElementById('get-reg-addr')?.value||'')}&mask=${encodeURIComponent(document.getElementById('get-reg-mask')?.value||'')}`);
+bindButtonRequest('set-pll','/cam/pll',()=>`?bypass=${encodeURIComponent(document.getElementById('pll-bypass')?.value||'')}&mul=${encodeURIComponent(document.getElementById('pll-mul')?.value||'')}&sys=${encodeURIComponent(document.getElementById('pll-sys')?.value||'')}&root=${encodeURIComponent(document.getElementById('pll-root')?.value||'')}&pre=${encodeURIComponent(document.getElementById('pll-pre')?.value||'')}&seld5=${encodeURIComponent(document.getElementById('pll-seld5')?.value||'')}&pclken=${encodeURIComponent(document.getElementById('pll-pclken')?.value||'')}&pclk=${encodeURIComponent(document.getElementById('pll-pclk')?.value||'')}`);
+};
+const bindControlTooltips=()=>{document.querySelectorAll('.menu-item').forEach(row=>{const label=row.querySelector('.menu-item-label');if(!label)return;const tip=(label.textContent||'').trim();if(!tip)return;row.querySelectorAll('.menu-item-control input,.menu-item-control select,.menu-item-control button').forEach(el=>{if(!el.getAttribute('title'))el.setAttribute('title',tip);});});};
+const initExtraMenuGroups=()=>{['imgset','imgadj','camsensor','adv','ui','about'].forEach(name=>{const group=document.getElementById(`${name}-menu-group`),toggle=document.getElementById(`${name}-menu-toggle`);if(!group||!toggle)return;const key=name==='ui'?UI_MENU_COLLAPSE_KEY:name==='about'?ABOUT_MENU_COLLAPSE_KEY:`ggkgMenuCollapsed:${name}`,saved=localStorage.getItem(key);const collapsed=saved===null?true:saved==='1';if(name==='ui')uiMenuCollapsed=collapsed;if(name==='about')aboutMenuCollapsed=collapsed;group.classList.toggle('collapsed',collapsed);toggle.setAttribute('aria-expanded',String(!collapsed));const d=currentDict();toggle.title=collapsed?d.expand:d.collapse;toggle.setAttribute('aria-label',collapsed?d.expand:d.collapse);toggle.onclick=()=>{const nowCollapsed=!group.classList.contains('collapsed');if(name==='ui')uiMenuCollapsed=nowCollapsed;if(name==='about')aboutMenuCollapsed=nowCollapsed;group.classList.toggle('collapsed',nowCollapsed);toggle.setAttribute('aria-expanded',String(!nowCollapsed));localStorage.setItem(key,nowCollapsed?'1':'0');const dict=currentDict();toggle.title=nowCollapsed?dict.expand:dict.collapse;toggle.setAttribute('aria-label',nowCollapsed?dict.expand:dict.collapse);if(!nowCollapsed&&name!=='ui'&&name!=='about')refreshMenuGroupState(name);};if(!collapsed&&name!=='ui'&&name!=='about')refreshMenuGroupState(name);});};
+const refreshStream=()=>{const d=currentDict();if(streamActive){streamButton.textContent=d.stopStream;streamButton.classList.add('stream-active')}else{streamButton.textContent=d.startStream;streamButton.classList.remove('stream-active')}};
+const updateControlLocks=()=>{const lockCapture=isStreamSwitching||isCapturePending;const lockStream=isStreamSwitching||isCapturePending;stillButton.disabled=lockCapture;if(lockCapture)stillButton.classList.add('disabled');else stillButton.classList.remove('disabled');streamButton.disabled=lockStream;if(lockStream)streamButton.classList.add('disabled');else streamButton.classList.remove('disabled')};
+const clearCapturePendingTimer=()=>{if(capturePendingTimer){clearTimeout(capturePendingTimer);capturePendingTimer=0}};
+const clearStreamWatchdog=()=>{if(streamStartWatchdogTimer){clearTimeout(streamStartWatchdogTimer);streamStartWatchdogTimer=0}};
+const armStreamWatchdog=()=>{clearStreamWatchdog();streamStartWatchdogTimer=setTimeout(()=>{if(!streamActive||streamHasFrame)return;if(streamStartRetries>=STREAM_MAX_RETRIES){isStreamStarting=false;updateControlLocks();setNoSignal(true);return;}streamStartRetries+=1;setNoSignal(true);setImageSource(CAM_STREAM_PATH,{cacheBust:true});armStreamWatchdog()},STREAM_START_TIMEOUT_MS)};
+const setImageSource=(path,{cacheBust=true}={})=>{const cb=cacheBust?`${path.includes('?')?'&':'?'}_cb=${Date.now()}`:'';const host=(path===CAM_STREAM_PATH)?streamHost:baseHost;view.src=`${host}${path}${cb}`};
+const updatePreviewScale=()=>{const w=frameWidth||Number(view.naturalWidth)||0;if(w<=0){document.documentElement.style.setProperty('--stream-preview-max-width','100%');return;}const containerWidth=Math.max(1,Math.round(streamContainer.clientWidth||view.parentElement?.clientWidth||0));if(containerWidth<=1){document.documentElement.style.setProperty('--stream-preview-max-width','100%');return;}const targetWidth=Math.min(containerWidth,w*2);document.documentElement.style.setProperty('--stream-preview-max-width',`${Math.round(targetWidth)}px`);};
+const updateFrameMetrics=()=>{const w=Number(view.naturalWidth)||0,h=Number(view.naturalHeight)||0;if(w>0&&h>0){frameWidth=w;frameHeight=h;streamHasFrame=true;isStreamStarting=false;streamStartRetries=0;clearStreamWatchdog();updateControlLocks();updatePreviewScale();return true;}return false;};
+const getFrameMetrics=()=>{if(updateFrameMetrics())return{width:frameWidth,height:frameHeight};if(frameWidth>0&&frameHeight>0)return{width:frameWidth,height:frameHeight};const rect=view.getBoundingClientRect();const rw=Math.round(rect.width),rh=Math.round(rect.height);if(rw>0&&rh>0)return{width:rw,height:rh};return null;};
+const applyTheme=(m)=>{const d=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light',e=m==='auto'?d:m;document.documentElement.style.colorScheme=e;document.documentElement.dataset.theme=e};
+const applyLang=(m)=>{const e=m==='auto'?uaLocale():m,d=I18N[e]||I18N['en-US'];document.documentElement.lang=e;document.querySelectorAll('[data-i18n]').forEach(el=>{const k=el.getAttribute('data-i18n');if(d[k])el.textContent=d[k]});if(gimbalMenuToggle){const tip=gimbalMenuCollapsed?d.expand:d.collapse;gimbalMenuToggle.title=tip;gimbalMenuToggle.setAttribute('aria-label',tip);}if(uiMenuToggle){const tip=uiMenuCollapsed?d.expand:d.collapse;uiMenuToggle.title=tip;uiMenuToggle.setAttribute('aria-label',tip);}if(aboutMenuToggle){const tip=aboutMenuCollapsed?d.expand:d.collapse;aboutMenuToggle.title=tip;aboutMenuToggle.setAttribute('aria-label',tip);}['imgset','imgadj','camsensor','adv'].forEach(name=>{const group=document.getElementById(`${name}-menu-group`),toggle=document.getElementById(`${name}-menu-toggle`);if(!group||!toggle)return;const collapsed=group.classList.contains('collapsed');const tip=collapsed?d.expand:d.collapse;toggle.title=tip;toggle.setAttribute('aria-label',tip);});refreshStream()};
+const syncMenuGroupArrow=(group,toggle,collapsed)=>{if(!group)return;group.classList.toggle('collapsed',collapsed);if(toggle)toggle.setAttribute('aria-expanded',String(!collapsed));};
+const getMenuState=(groupName)=>{if(groupName==='ui')return{group:uiMenuGroup,toggle:uiMenuToggle,flag:uiMenuCollapsed,key:UI_MENU_COLLAPSE_KEY};if(groupName==='about')return{group:aboutMenuGroup,toggle:aboutMenuToggle,flag:aboutMenuCollapsed,key:ABOUT_MENU_COLLAPSE_KEY};return{group:gimbalMenuGroup,toggle:gimbalMenuToggle,flag:gimbalMenuCollapsed,key:GIMBAL_MENU_COLLAPSE_KEY};};
+const setMenuCollapsed=(groupName,collapsed,{persist=true}={})=>{if(groupName==='ui')uiMenuCollapsed=!!collapsed;else if(groupName==='about')aboutMenuCollapsed=!!collapsed;else gimbalMenuCollapsed=!!collapsed;const st=getMenuState(groupName),wasCollapsed=!st.toggle||st.toggle.getAttribute('aria-expanded')!=='true';syncMenuGroupArrow(st.group,st.toggle,st.flag);if(persist)localStorage.setItem(st.key,st.flag?'1':'0');if(st.toggle){const d=currentDict();const tip=st.flag?d.expand:d.collapse;st.toggle.title=tip;st.toggle.setAttribute('aria-label',tip);}if(!st.flag&&wasCollapsed)refreshMenuGroupState(groupName);if(groupName!=='ui'&&groupName!=='about')updateGimbalScale();};
+const setNoSignal=(show)=>{if(show)streamContainer.classList.add('no-signal');else streamContainer.classList.remove('no-signal')};
+const stopStream=()=>{clearStreamWatchdog();clearCapturePendingTimer();if(streamActive||view.src){view.src=''}streamActive=false;streamHasFrame=false;streamStartRetries=0;isStreamStarting=false;frameWidth=0;frameHeight=0;document.documentElement.style.setProperty('--stream-preview-max-width','100%');refreshStream();updateControlLocks();setNoSignal(true)};
+const startStream=()=>{clearCapturePendingTimer();setNoSignal(true);streamHasFrame=false;streamStartRetries=0;isStreamStarting=true;isCapturePending=false;currentImageMode='stream';updateControlLocks();setImageSource(CAM_STREAM_PATH,{cacheBust:false});streamActive=true;refreshStream();armStreamWatchdog()};
+const clamp=(v)=>Math.max(-90,Math.min(90,Number(v)||0));
+const fmtAngle=(v)=>Number(clamp(v).toFixed(1));
+const syncGimbal=(yaw,pitch)=>{const y=fmtAngle(yaw),p=fmtAngle(pitch);gYaw.value=y;gYawNum.value=y;gPitch.value=p;gPitchNum.value=p};
+const servoSet=(yaw,pitch)=>fetch(`${baseHost}/servo?yaw=${encodeURIComponent(fmtAngle(yaw))}&pitch=${encodeURIComponent(fmtAngle(pitch))}`).then(r=>r.json()).then(d=>{if(d.yaw&&d.pitch)syncGimbal(d.yaw.angle,d.pitch.angle)}).catch(()=>{});
+const servoHandle=(x,y,limit=300)=>fetch(`${baseHost}/servo/handle?x=${encodeURIComponent(x.toFixed(1))}&y=${encodeURIComponent(y.toFixed(1))}&limit_ms=${limit}`).then(r=>r.json()).then(d=>syncGimbal(d.yaw,d.pitch)).catch(()=>{});
+const servoReset=()=>fetch(`${baseHost}/servo/reset`).then(r=>r.json()).then(d=>{if(d.yaw&&d.pitch)syncGimbal(d.yaw.angle,d.pitch.angle);else syncGimbal(0,0)}).catch(()=>syncGimbal(0,0));
+const servoRefresh=()=>fetch(`${baseHost}/servo`).then(r=>r.json()).then(d=>{if(d.yaw&&d.pitch)syncGimbal(d.yaw.angle,d.pitch.angle)}).catch(()=>{});
+const stepGimbal=(dy,dp)=>{const y=fmtAngle(Number(gYaw.value)+dy),p=fmtAngle(Number(gPitch.value)+dp);syncGimbal(y,p);servoSet(y,p)};
+const updateGimbalScale=()=>{const hostW=(gimbalPanel.parentElement?.clientWidth||window.innerWidth);const contentW=Math.max(180,hostW-20);const hideValues=contentW<360;const hideAux=contentW<300;gimbalPanel.classList.toggle('hide-values',hideValues);gimbalPanel.classList.toggle('hide-aux',hideAux);const reserved=hideAux?0:(hideValues?36:118);const effective=Math.max(150,contentW-reserved);const s=Math.max(0.56,Math.min(1,effective/190));document.documentElement.style.setProperty('--g-scale',String(s));};
+const clearPadPress=()=>gPad.classList.remove(...padPressClasses);
+const setPadPress=(dir)=>{clearPadPress();if(dir)gPad.classList.add('press-'+dir)};
+const getPadDirection=(e)=>{const r=gPad.getBoundingClientRect();const cx=r.left+r.width/2,cy=r.top+r.height/2;const dx=e.clientX-cx,dy=e.clientY-cy;const dist=Math.hypot(dx,dy);const outer=r.width/2,inner=outer*0.43;if(dist<inner||dist>outer)return'';const a=Math.atan2(dy,dx)*180/Math.PI;if(a>=-45&&a<45)return'right';if(a>=45&&a<135)return'down';if(a>=-135&&a<-45)return'up';return'left'};
+const stepPadDirection=(dir,send=true)=>{if(dir==='right'){if(send)stepGimbal(3,0);return true;}if(dir==='down'){if(send)stepGimbal(0,3);return true;}if(dir==='up'){if(send)stepGimbal(0,-3);return true;}if(dir==='left'){if(send)stepGimbal(-3,0);return true;}return false};
+const stopPadHold=()=>{if(padHoldDelayTimer){clearTimeout(padHoldDelayTimer);padHoldDelayTimer=0;}if(padHoldTimer){clearInterval(padHoldTimer);padHoldTimer=0;}if(padLongPressActive)servoHandle(0,0,300);else if(padHoldDir)stepPadDirection(padHoldDir);padHoldDir='';padLongPressActive=false;clearPadPress()};
+const handlePadPointerDown=(e)=>{if(gHandleDragging)return;e.preventDefault();const dir=getPadDirection(e);if(!dir)return;try{gPad.setPointerCapture(e.pointerId)}catch(_){ }if(padHoldDelayTimer)clearTimeout(padHoldDelayTimer);if(padHoldTimer)clearInterval(padHoldTimer);padHoldDir=dir;padLongPressActive=false;setPadPress(dir);padHoldDelayTimer=setTimeout(()=>{padHoldDelayTimer=0;padLongPressActive=true;const vx=dir==='right'?18:dir==='left'?-18:0,vy=dir==='down'?18:dir==='up'?-18:0;servoHandle(vx,vy,300);padHoldTimer=setInterval(()=>servoHandle(vx,vy,300),120)},800)};
+const resetGimbalHandle=()=>{gHandleDragging=false;gHandleVector={x:0,y:0};gHandle.style.transform='translate(-50%,-50%)';gPad.classList.remove('dragging');servoHandle(0,0,300)};
+const updateGimbalHandle=(e)=>{const r=gPad.getBoundingClientRect();const cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy;const outer=r.width/2,handleRadius=gHandle.getBoundingClientRect().width/2,max=Math.max(0,outer-handleRadius);const dist=Math.hypot(dx,dy);if(dist>max&&dist>0){dx=dx/dist*max;dy=dy/dist*max}gHandleVector={x:max?dx/max:0,y:max?dy/max:0};gHandle.style.transform=`translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px))`};
+const handleGimbalHandleDown=(e)=>{e.preventDefault();e.stopPropagation();stopPadHold();gHandleDragging=true;gPad.classList.add('dragging');try{gHandle.setPointerCapture(e.pointerId)}catch(_){ }updateGimbalHandle(e)};
+const handleGimbalHandleMove=(e)=>{if(!gHandleDragging)return;e.preventDefault();updateGimbalHandle(e);servoHandle(gHandleVector.x*30,gHandleVector.y*30,300)};
+const handleGimbalHandleUp=(e)=>{if(!gHandleDragging)return;e.preventDefault();resetGimbalHandle()};
+const placeGimbal=()=>{const desktop=window.matchMedia('(min-width: 820px)').matches;const belowSpace=window.innerHeight-cameraRegion.getBoundingClientRect().bottom;const canUseStatus=desktop&&statusBox.clientWidth>=320&&belowSpace>=220;const menuHost=document.querySelector('.menu');if(gimbalPanel.parentNode!==gimbalMenuSlot)gimbalMenuSlot.appendChild(gimbalPanel);if(canUseStatus){if(gimbalMenuGroup.parentNode!==gimbalStatusSlot)gimbalStatusSlot.appendChild(gimbalMenuGroup);statusBox.classList.add('has-gimbal');statusPlaceholder.style.display='none';}else{if(menuHost&&gimbalMenuGroup.parentNode!==menuHost)menuHost.insertBefore(gimbalMenuGroup,menuHost.firstElementChild||null);statusBox.classList.remove('has-gimbal');statusPlaceholder.style.display=desktop?'flex':'none';}const menuNeedsStackScroll=(()=>{if(desktop||canUseStatus||!menuHost)return false;const available=Math.max(0,window.innerHeight-menuHost.getBoundingClientRect().top);const visibleRows=[...menuHost.querySelectorAll('.menu-item')].filter(el=>el.getClientRects().length>0);const sampleRows=visibleRows.slice(0,MIN_MENU_VISIBLE_ROWS);let menuLineHeight=0;if(sampleRows.length){const total=sampleRows.reduce((sum,el)=>sum+el.getBoundingClientRect().height,0);menuLineHeight=total/sampleRows.length;}if(!(menuLineHeight>0)){const head=menuHost.querySelector('.menu-group-head');if(head&&head.getClientRects().length>0)menuLineHeight=head.getBoundingClientRect().height;}if(!(menuLineHeight>0)){menuLineHeight=Math.round(parseFloat(getComputedStyle(menuHost).fontSize||'16')*2.6);}menuLineHeight=Math.max(32,Math.round(menuLineHeight));return available<menuLineHeight*MIN_MENU_VISIBLE_ROWS;})();document.documentElement.classList.toggle('stack-scroll',menuNeedsStackScroll);updateGimbalScale();updatePreviewScale();};
+stillButton.onclick=()=>{if(isCapturePending||isStreamSwitching)return;isCapturePending=true;currentImageMode='capture';updateControlLocks();clearCapturePendingTimer();capturePendingTimer=setTimeout(()=>{if(currentImageMode==='capture'){isCapturePending=false;updateControlLocks();}},4000);const doCapture=()=>{setNoSignal(true);setImageSource(CAM_CAPTURE_PATH);};if(streamActive){isStreamSwitching=true;updateControlLocks();stopStream();isStreamSwitching=false;updateControlLocks();setTimeout(doCapture,120)}else{doCapture()}};
+streamButton.onclick=()=>{if(isStreamSwitching||isCapturePending)return;isStreamSwitching=true;updateControlLocks();if(streamActive)stopStream();else startStream();isStreamSwitching=false;updateControlLocks()};
+resetButton.onclick=()=>{stopStream();setNoSignal(true);fetch(`${baseHost}/restart`).catch(()=>{}).finally(()=>{setTimeout(()=>{window.location.reload()},1800);});};
+enrollButton.onclick=()=>{fetch(`${baseHost}${CAM_CONTROL_PATH}?var=face_enroll&val=1`).catch(()=>{})};
+saveButton.onclick=async(ev)=>{ev.preventDefault();const metrics=getFrameMetrics();if(!metrics){return;}const c=document.createElement('canvas');c.width=metrics.width;c.height=metrics.height;const ctx=c.getContext('2d');if(!ctx){return;}ctx.drawImage(view,0,0,metrics.width,metrics.height);try{const blob=await new Promise((resolve)=>c.toBlob(resolve,'image/jpeg'));if(!blob)return;if(saveObjectUrl){URL.revokeObjectURL(saveObjectUrl);saveObjectUrl='';}saveObjectUrl=URL.createObjectURL(blob);const d=new Date();const domain=document.location.hostname;const filename=(sysHostname&&sysHostname.length>0) ? `ggkg_${sysHostname}_${domain}_${iso8601Local(d)}.jpg` : `ggkg_${domain}_${iso8601Local(d)}.jpg`;const dl=document.createElement('a');dl.href=saveObjectUrl;dl.download=filename;dl.rel='noopener';document.body.appendChild(dl);dl.click();dl.parentNode.removeChild(dl);setTimeout(()=>{if(saveObjectUrl){URL.revokeObjectURL(saveObjectUrl);saveObjectUrl='';saveButton.href='#';}},800);}catch(e){console.error(e)}};
+view.addEventListener('load',()=>{updateFrameMetrics();setNoSignal(false);if(currentImageMode==='capture'){isCapturePending=false;clearCapturePendingTimer();}updateControlLocks();});
+view.addEventListener('error',()=>{if(streamActive){streamHasFrame=false;}if(currentImageMode==='capture'){isCapturePending=false;clearCapturePendingTimer();}setNoSignal(true);updateControlLocks()});
+gPad.addEventListener('pointerdown',handlePadPointerDown);
+gPad.addEventListener('pointerup',stopPadHold);
+gPad.addEventListener('pointercancel',stopPadHold);
+gPad.addEventListener('lostpointercapture',stopPadHold);
+gPad.addEventListener('contextmenu',e=>e.preventDefault());
+gHandle.addEventListener('pointerdown',handleGimbalHandleDown);
+gHandle.addEventListener('pointermove',handleGimbalHandleMove);
+gHandle.addEventListener('pointerup',handleGimbalHandleUp);
+gHandle.addEventListener('pointercancel',handleGimbalHandleUp);
+gHandle.addEventListener('lostpointercapture',handleGimbalHandleUp);
+gHandle.addEventListener('contextmenu',e=>e.preventDefault());
+document.getElementById('g-reset').onclick=()=>servoReset();
+if(gimbalMenuToggle)gimbalMenuToggle.onclick=()=>setMenuCollapsed('gimbal',!gimbalMenuCollapsed);
+if(uiMenuToggle)uiMenuToggle.onclick=()=>setMenuCollapsed('ui',!uiMenuCollapsed);
+if(aboutMenuToggle)aboutMenuToggle.onclick=()=>setMenuCollapsed('about',!aboutMenuCollapsed);
+
+gYaw.oninput=()=>{syncGimbal(gYaw.value,gPitch.value);servoSet(gYaw.value,gPitch.value)};
+gPitch.oninput=()=>{syncGimbal(gYaw.value,gPitch.value);servoSet(gYaw.value,gPitch.value)};
+gYawNum.onchange=()=>{syncGimbal(gYawNum.value,gPitchNum.value);servoSet(gYawNum.value,gPitchNum.value)};
+gPitchNum.onchange=()=>{syncGimbal(gYawNum.value,gPitchNum.value);servoSet(gYawNum.value,gPitchNum.value)};
+const st=localStorage.getItem('ggkgThemeMode')||'auto',sl=localStorage.getItem('ggkgLangMode')||'auto';
+gimbalMenuCollapsed=false;
+uiMenuCollapsed=true;
+aboutMenuCollapsed=true;
+themeSelect.value=st;langSelect.value=sl;
+applyTheme(st);applyLang(sl);
+syncGimbal(0,0);
+bindMenuControlEvents();
+bindControlTooltips();
+initExtraMenuGroups();
+refreshMenuGroupState('gimbal');
+servoRefresh();
+placeGimbal();
+fetchSysHostname();
+
+framesize.addEventListener('change',()=>{normalizeFramesizeSelection();});
+
+themeSelect.addEventListener('change',()=>{const v=themeSelect.value;localStorage.setItem('ggkgThemeMode',v);applyTheme(v)});
+langSelect.addEventListener('change',()=>{const v=langSelect.value;localStorage.setItem('ggkgLangMode',v);applyLang(v)});
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(themeSelect.value==='auto')applyTheme('auto')});
+window.addEventListener('resize',()=>{placeGimbal()});
+window.addEventListener('orientationchange',()=>{placeGimbal()});
+})();
+</script>
+</body>
+</html>
