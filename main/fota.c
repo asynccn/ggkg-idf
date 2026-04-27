@@ -27,6 +27,11 @@
 #include "esp_random.h"
 #include "esp_system.h"
 
+#include "esp_task_wdt.h"
+
+#include "esp_camera.h"
+#include "camera.h"
+
 #include "webserver.h"
 #include "config_vars.h"
 
@@ -231,10 +236,25 @@ static esp_err_t handler_fota_page(httpd_req_t *req)
 static esp_err_t fota_recv_full(httpd_req_t *req, char *buf, size_t buf_len, int *received)
 {
     int ret;
-    do
+    int timeout_retry = 0;
+
+    while (true)
     {
         ret = httpd_req_recv(req, buf, buf_len);
-    } while (ret == HTTPD_SOCK_ERR_TIMEOUT);
+        if (ret == HTTPD_SOCK_ERR_TIMEOUT)
+        {
+            ++timeout_retry;
+            (void)esp_task_wdt_reset();
+            vTaskDelay(1);
+            if (timeout_retry > 2000)
+            {
+                *received = ret;
+                return ESP_ERR_TIMEOUT;
+            }
+            continue;
+        }
+        break;
+    }
 
     if (ret <= 0)
     {
@@ -253,6 +273,7 @@ static void fota_send_restart_task(void *arg)
     esp_restart();
 }
 
+
 static esp_err_t handler_fota_upload(httpd_req_t *req)
 {
     if (req == NULL)
@@ -263,11 +284,13 @@ static esp_err_t handler_fota_upload(httpd_req_t *req)
     esp_err_t err = fota_check_auth(req);
     if (err != ESP_OK)
     {
+        ESP_LOGW(TAG, "auth failed: %s", esp_err_to_name(err));
         return ESP_OK;
     }
 
     if (req->content_len <= 0)
     {
+        ESP_LOGE(TAG, "empty content");
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Empty firmware body");
         return ESP_FAIL;
     }
@@ -276,20 +299,17 @@ static esp_err_t handler_fota_upload(httpd_req_t *req)
     const esp_partition_t *update = esp_ota_get_next_update_partition(NULL);
     if (update == NULL)
     {
-        ESP_LOGE(TAG, "no OTA update partition found");
+        ESP_LOGE(TAG, "no OTA partition");
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No OTA partition");
         return ESP_FAIL;
     }
 
-    ESP_LOGI(TAG,
-             "running partition: %s, update partition: %s, image size: %d",
-             running ? running->label : "unknown",
-             update->label,
-             req->content_len);
+    ESP_LOGI(TAG, "running=%s update=%s image_size=%d",
+             running ? running->label : "unknown", update->label, req->content_len);
 
     if ((size_t)req->content_len > update->size)
     {
-        ESP_LOGE(TAG, "firmware is too large: %d > %zu", req->content_len, (size_t)update->size);
+        ESP_LOGE(TAG, "image too large: %d > %zu", req->content_len, (size_t)update->size);
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Firmware too large for OTA partition");
         return ESP_FAIL;
     }
@@ -297,21 +317,67 @@ static esp_err_t handler_fota_upload(httpd_req_t *req)
     char *buf = malloc(FOTA_RECV_BUF_LEN);
     if (buf == NULL)
     {
+        ESP_LOGE(TAG, "malloc recv buf failed");
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No memory");
         return ESP_ERR_NO_MEM;
     }
 
     esp_ota_handle_t ota_handle = 0;
     bool ota_started = false;
+    bool wdt_added = false;
+    bool camera_deinited = false;
     int remaining = req->content_len;
+    const int total_len = req->content_len;
     int received = 0;
     int written = 0;
+    int chunk_idx = 0;
+    int last_pct_reported = -1;
 
-    err = esp_ota_begin(update, req->content_len, &ota_handle);
+    err = esp_task_wdt_add(NULL);
+    if (err == ESP_OK)
+    {
+        wdt_added = true;
+    }
+    else
+    {
+        ESP_LOGW(TAG, "esp_task_wdt_add failed: %s", esp_err_to_name(err));
+    }
+
+#if defined(ESP_CAMERA_SUPPORTED) && ESP_CAMERA_SUPPORTED
+    err = esp_camera_deinit();
+    if (err == ESP_OK)
+    {
+        camera_deinited = true;
+    }
+    else
+    {
+        ESP_LOGW(TAG, "camera deinit failed: %s", esp_err_to_name(err));
+    }
+    vTaskDelay(pdMS_TO_TICKS(20));
+#endif
+
+    ESP_LOGI(TAG, "esp_ota_begin(size=%d)", req->content_len);
+    err = esp_ota_begin(update, (size_t)req->content_len, &ota_handle);
     if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "esp_ota_begin failed: %s", esp_err_to_name(err));
         free(buf);
+
+#if defined(ESP_CAMERA_SUPPORTED) && ESP_CAMERA_SUPPORTED
+        if (camera_deinited)
+        {
+            esp_err_t reinit_err = camera_init();
+            if (reinit_err != ESP_OK)
+            {
+                ESP_LOGW(TAG, "camera reinit failed: %s", esp_err_to_name(reinit_err));
+            }
+        }
+#endif
+
+        if (wdt_added)
+        {
+            (void)esp_task_wdt_delete(NULL);
+        }
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA begin failed");
         return err;
     }
@@ -320,22 +386,44 @@ static esp_err_t handler_fota_upload(httpd_req_t *req)
     while (remaining > 0)
     {
         size_t recv_len = MIN((size_t)remaining, (size_t)FOTA_RECV_BUF_LEN);
+
+        (void)esp_task_wdt_reset();
         err = fota_recv_full(req, buf, recv_len, &received);
         if (err != ESP_OK)
         {
-            ESP_LOGE(TAG, "firmware receive failed after %d bytes", written);
+            ESP_LOGE(TAG, "recv failed, written=%d, remaining=%d, err=%s",
+                     written, remaining, esp_err_to_name(err));
             break;
         }
 
+        (void)esp_task_wdt_reset();
         err = esp_ota_write(ota_handle, buf, received);
         if (err != ESP_OK)
         {
-            ESP_LOGE(TAG, "esp_ota_write failed after %d bytes: %s", written, esp_err_to_name(err));
+            ESP_LOGE(TAG, "write failed, written=%d, received=%d, err=%s",
+                     written, received, esp_err_to_name(err));
             break;
         }
 
         written += received;
         remaining -= received;
+        chunk_idx++;
+        
+        int pct = (total_len > 0) ? (written * 100 / total_len) : 0;
+        if (pct > 100)
+        {
+            pct = 100;
+        }
+        
+        if (pct != last_pct_reported && ((pct % 5) == 0 || remaining == 0))
+        {
+            last_pct_reported = pct;
+            ESP_LOGI(TAG, "progress %d%% (%d/%d bytes), remaining=%d, chunk=%d",
+                     pct, written, total_len, remaining, chunk_idx);
+        }
+
+        (void)esp_task_wdt_reset();
+        vTaskDelay(1);
     }
 
     free(buf);
@@ -355,8 +443,13 @@ static esp_err_t handler_fota_upload(httpd_req_t *req)
         err = esp_ota_set_boot_partition(update);
         if (err != ESP_OK)
         {
-            ESP_LOGE(TAG, "esp_ota_set_boot_partition failed: %s", esp_err_to_name(err));
+            ESP_LOGE(TAG, "set boot partition failed: %s", esp_err_to_name(err));
         }
+    }
+
+    if (wdt_added)
+    {
+        (void)esp_task_wdt_delete(NULL);
     }
 
     if (err != ESP_OK)
@@ -365,11 +458,23 @@ static esp_err_t handler_fota_upload(httpd_req_t *req)
         {
             esp_ota_abort(ota_handle);
         }
+
+#if defined(ESP_CAMERA_SUPPORTED) && ESP_CAMERA_SUPPORTED
+        if (camera_deinited)
+        {
+            esp_err_t reinit_err = camera_init();
+            if (reinit_err != ESP_OK)
+            {
+                ESP_LOGW(TAG, "camera reinit failed: %s", esp_err_to_name(reinit_err));
+            }
+        }
+#endif
+
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, esp_err_to_name(err));
         return err;
     }
 
-    ESP_LOGI(TAG, "OTA update completed, written %d bytes, restarting", written);
+    ESP_LOGI(TAG, "completed, written=%d, restarting", written);
     httpd_resp_set_type(req, "text/plain; charset=utf-8");
     httpd_resp_sendstr(req, "Upload complete");
     xTaskCreate(fota_send_restart_task, "fota_restart", 2048, NULL, 5, NULL);
