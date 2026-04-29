@@ -1,17 +1,3 @@
-<div align="center">
-<table>
-  <tr>
-    <td width="72" valign="top">
-      <img src="res/favicon.ico" alt="GGKG icon" width="64" height="64" />
-    </td>
-    <td valign="top">
-      <strong style="font-size: 20px;">GGKG</strong><br />
-      <a href="https://github.com/beach114514/">GG</a> &amp; <a href="https://github.com/zol-c/">kontornl</a> Gimbal
-    </td>
-  </tr>
-</table>
-</div>
-
 # GGKG-IDF
 
 GG & kontornl Gimbal ESP-IDF
@@ -60,7 +46,25 @@ The following features and defects are under development:
 
 - [ ] Repair gimbal handle which cannot perform swiftly when being dragged
 
+- [ ] Memorize gimbal position and apply to next boot, logic: 
+
+    1. Read and apply stored position from flash;
+
+    2. Save current position to flash in any seconds after the last time gimbal is moved.
+
 ## Other
+
+<table>
+  <tr>
+    <td width="72" valign="top">
+      <img src="res/favicon.ico" alt="GGKG icon" width="64" height="64" />
+    </td>
+    <td valign="top">
+      <strong style="font-size: 20px;">GGKG</strong><br />
+      <a href="https://github.com/beach114514/">GG</a> &amp; <a href="https://github.com/zol-c/">kontornl</a> Gimbal
+    </td>
+  </tr>
+</table>
 
 ```log
 +------------------------------+
