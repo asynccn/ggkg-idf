@@ -50,6 +50,19 @@
 
 static const char *TAG = "camera";
 
+static void camera_warmup_frames(uint8_t count)
+{
+    for (uint8_t i = 0; i < count; ++i)
+    {
+        camera_fb_t *fb = esp_camera_fb_get();
+        if (fb != NULL)
+        {
+            esp_camera_fb_return(fb);
+        }
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+}
+
 static camera_config_t camera_config = {
     .pin_pwdn = CAM_PIN_PWDN,
     .pin_reset = CAM_PIN_RESET,
@@ -126,6 +139,8 @@ esp_err_t camera_init(void)
             ESP_LOGW(TAG, "set_vflip failed: %d", rc);
         }
     }
+
+    camera_warmup_frames(3);
 
     return ESP_OK;
 #else

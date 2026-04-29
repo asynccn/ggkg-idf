@@ -31,6 +31,18 @@ typedef struct
     size_t len;
 } jpg_chunking_t;
 
+static void camera_flush_frames(uint8_t count)
+{
+    for (uint8_t i = 0; i < count; ++i)
+    {
+        camera_fb_t *tmp = esp_camera_fb_get();
+        if (tmp != NULL)
+        {
+            esp_camera_fb_return(tmp);
+        }
+    }
+}
+
 static esp_err_t handler_capture(httpd_req_t *req)
 {
     if (req == NULL)
@@ -55,6 +67,8 @@ static esp_err_t handler_capture(httpd_req_t *req)
         ESP_LOGE(TAG, "auth failed due to %s", esp_err_to_name(err));
         return err;
     }
+
+    camera_flush_frames(2);
 
     camera_fb_t *fb = esp_camera_fb_get();
     if (fb == NULL)
