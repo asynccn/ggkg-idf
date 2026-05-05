@@ -12,6 +12,12 @@ This firmware provides a friendly web page for capturing and device setting, a s
 
 For HTTP API and other document, refer to `doc/` directory.
 
+## Update From Old GGKG
+
+Partition table and NVS keys are different from old GGKG, and the GGKG-IDF firmware doesn't support auto migrating from old firmware. User must flash the GGKG-IDF firmware by ESP-IDF extension, or to ensure both the user app firmware and the partition table are flashed into your device correctly to guarantee FOTA and NVS persistence functionality.
+
+Never flash only the user app firmware without changing the partition table if your device was never been flashed with full GGKG-IDF firmware before, even you flashed the [Arduino version of GGKG firmware](https://github.com/zol-c/GGKG). After fully flashing the GGKG-IDF firmware, methods such as FOTA can be accepted.
+
 ## Build
 
 [ESP-IDF](https://github.com/espressif/esp-idf) 5.1.1 or newer is required for building this project, and a Python script at `utils/gen_htdocs.py` will be automatically executed to generate `main/htdocs.h` from resources in `res/` directory to embed web resources into firmware, which is specified in `main/CMakeLists.txt` and requires Python >= 3.6 to be installed and included in PATH.
