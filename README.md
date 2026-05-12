@@ -16,6 +16,12 @@ For HTTP API and other document, refer to `doc/` directory.
 
 Partition table and NVS keys are different from old GGKG, and the GGKG-IDF firmware doesn't support auto migrating from old firmware. User must flash the GGKG-IDF firmware by ESP-IDF extension, or to ensure both the user app firmware and the partition table are flashed into your device correctly to guarantee FOTA and NVS persistence functionality.
 
+An example of firmware flashing command is given below, with images provided with [Releases](https://github.com/asynccn/ggkg-idf/releases).
+
+```shell
+python esptool.py -p /dev/ttyUSB0 -b 460800 --before default_reset --after hard_reset --chip esp32 write_flash --flash_mode dio --flash_freq 80m --flash_size detect 0x1000 bootloader.bin 0x80000 ggkg-idf.bin 0x8000 partition-table.bin 0xe000 ota_data_initial.bin
+```
+
 Never flash only the user app firmware without changing the partition table if your device was never been flashed with full GGKG-IDF firmware before, even you flashed the [Arduino version of GGKG firmware](https://github.com/zol-c/GGKG). After fully flashing the GGKG-IDF firmware, methods such as FOTA can be accepted.
 
 ## Build
