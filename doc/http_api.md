@@ -91,6 +91,12 @@
   - Response: `application/json`, shape `{"uptime_ms":<uint64>}`
   - Auth: No
 
+- `GET /sys/version`
+  - Purpose: Returns firmware version string
+  - Response: `application/json`, shape `{"firmware":"<version>"}`
+  - Auth: No
+  - Note: `firmware` is from `esp_app_get_description()->version` (typically derived from `git describe`)
+
 ### 1.4 Camera Control (All under `/cam/*`)
 
 - `GET /cam/control` (legacy `/control`): General image parameter control

@@ -89,6 +89,12 @@
   - 鑑權：否
   - 說明：`uptime_ms` 來自單調高精度計時器（`esp_timer`），與 SNTP 無關。
 
+- `GET /sys/version`
+  - 作用：回傳韌體版本字串
+  - 回應：`application/json`，形如 `{"firmware":"v1.0.0"}`
+  - 鑑權：否
+  - 說明：`firmware` 來自 `esp_app_get_description()->version`（通常由 `git describe` 衍生）。
+
 ### 1.4 相機控制（全部置於 `/cam/*`）
 
 - `GET /cam/control`（原 `/control`）：一般影像參數控制

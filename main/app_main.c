@@ -1,5 +1,6 @@
 #include <esp_log.h>
 #include <esp_system.h>
+#include <esp_app_desc.h>
 #include <nvs_flash.h>
 #include <sys/param.h>
 #include <string.h>
@@ -28,7 +29,9 @@ static const char *TAG = "app_main";
 |      Research Institute      |\r\n\
 |                              |\r\n\
 | G G K G              G G K G |\r\n\
-+------------------------------+\r\n"
++------------------------------+\r\n\
+🍆🍆🍆🍆🍆🍆🍆🍆🍆🍆🍆🍆🍆🍆🍆🍆\r\n\
+\r\n"
 
 #include "esp_console.h"
 // (24/05/2025 kontornl) path: ${IDF_PATH}/examples/system/console/advanced/components
@@ -90,6 +93,7 @@ esp_err_t uart_init(void)
 void app_main(void)
 {
     ESP_LOGI(TAG, GGKG_CONSOLE_SPLASH);
+    ESP_LOGI(TAG, "GGKG-IDF %s", esp_app_get_description()->version);
 
     esp_err_t err;
     config_init();

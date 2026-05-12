@@ -35,6 +35,7 @@
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "esp_core_dump.h"
+#include "esp_app_desc.h"
 
 #include "config.h"
 #include "config_keys.h"
@@ -526,6 +527,24 @@ static esp_err_t handler_uptime(httpd_req_t *req)
     return httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
 }
 
+static esp_err_t handler_version(httpd_req_t *req)
+{
+    if (req == NULL)
+    {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    const esp_app_desc_t *app = esp_app_get_description();
+    const char *ver = (app != NULL && app->version[0] != '\0') ? app->version : "unknown";
+
+    char json[128] = {0};
+    (void)snprintf(json, sizeof(json), "{\"firmware\":\"%s\"}", ver);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    return httpd_resp_send(req, json, HTTPD_RESP_USE_STRLEN);
+}
+
 static void sys_restart_task(void *arg)
 {
     (void)arg;
@@ -742,7 +761,7 @@ static esp_err_t handler_coredump(httpd_req_t *req)
                  "attachment; filename=\"ggkg_coredump_%s_%s.elf\"",
                  server_addr, iso_time);
     }
-    
+
     // Allocate buffer for streaming
     uint8_t *chunk_buf = (uint8_t *)malloc(4096);
     if (chunk_buf == NULL)
@@ -865,6 +884,18 @@ esp_err_t webserv_sys_init(void)
         .user_ctx = NULL};
 
     err = webserver_reg_uri_handle(&uri_handle_uptime);
+    if (err != ESP_OK)
+    {
+        return err;
+    }
+
+    httpd_uri_t uri_handle_version = {
+        .uri = "/sys/version",
+        .method = HTTP_GET,
+        .handler = handler_version,
+        .user_ctx = NULL};
+
+    err = webserver_reg_uri_handle(&uri_handle_version);
     if (err != ESP_OK)
     {
         return err;
