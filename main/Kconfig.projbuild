@@ -122,4 +122,22 @@ menu "Network"
             bool "WAPI PSK"
     endchoice
 
+    config GGKG_POSIX_TZ
+        string "POSIX TZ environment string"
+        default "CST-8"
+        help
+            Applied at boot via setenv(\"TZ\", ...) and tzset().
+            CST-8 is China (UTC+8) in POSIX notation; use HKT-8 for Hong Kong same offset.
+
+    config GGKG_SNTP_ENABLE
+        bool "Enable SNTP after Wi-Fi gets IP"
+        default y
+
+    config GGKG_SNTP_SERVER
+        string "SNTP server hostname"
+        default "pool.ntp.org"
+        depends on GGKG_SNTP_ENABLE
+        help
+            Primary NTP pool or server; resolved after DHCP/static IP is applied.
+
 endmenu

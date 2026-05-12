@@ -4,5 +4,6 @@ nvs_key,    data,   nvs_keys,   0x9000,     4K,     encrypted
 nvs,        data,   nvs,        ,           16K,
 otadata,    data,   ota,        ,           8K,
 phy_init,   data,   phy,        ,           4K,
-ota_0,      app,    ota_0,      ,           1800K,
-ota_1,      app,    ota_1,      ,           1800K,
+coredump,   data,   coredump,   ,           64K,
+ota_0,      app,    ota_0,      0x80000,    1792K,
+ota_1,      app,    ota_1,      ,           1792K,

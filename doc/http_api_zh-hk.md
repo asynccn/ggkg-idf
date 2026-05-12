@@ -50,15 +50,44 @@
   - Arduino 版來源：`/config`
 
 - `GET /sys/hostname`
-  - 作用：回傳裝置 hostname 純文字（僅回傳 hostname 字串）
+  - 作用：回傳裝置 hostname **純文字**（回應本文僅為 hostname 字串，非 JSON）
   - 回應：`text/plain`
   - 鑑權：否
-  - 說明：供前端頁面標題與儲存檔名前綴顯示
+  - 說明：與設定項 `hostname` 相同（需鑑權的 `GET /config?var=hostname`）。Arduino 舊版為 **`GET /hostname`**，本 IDF 版路徑為 **`GET /sys/hostname`**。
+
+- `GET /sys/coredump`
+  - 作用：下載 coredump 分區作為 ELF 檔案，用於事後除錯分析
+  - 回應：`application/octet-stream`（二進位檔案下載）
+  - 檔名：
+    - 有 hostname：`ggkg_coredump_<hostname>_<客戶端IP>_<iso8601>.elf`（例如 `ggkg_coredump_ggkgice_192.168.1.23_20260512T095005+0800.elf`）
+    - 無 hostname：`ggkg_coredump_<客戶端IP>_<iso8601>.elf`（例如 `ggkg_coredump_192.168.1.23_20260512T095005+0800.elf`）
+  - 大小：64KB（整個 coredump 分區）
+  - 鑑權：是
+  - 說明：分區以 4KB 區塊串流傳輸。若啟用快閃記憶體加密，下載的資料將為加密狀態，需使用 `esptool.py` 或 `esp-coredump` 工具配合適當的快閃記憶體加密金鑰解密後才能分析。檔名中的客戶端 IP 可能顯示為 IPv4-mapped IPv6 位址格式（例如 `___FFFF_192.168.1.23`）。
 
 - `GET /restart`
-  - 作用：觸發裝置重啟
-  - 回應：`{"ok":true,"restart":true}`
+  - 作用：回傳 JSON 後觸發裝置重啟
+  - 回應：`application/json`，`{"ok":true,"restart":true}`
   - 鑑權：是
+
+- `GET /crash`
+  - 作用：延遲 1000ms 後透過 `assert(0)` 觸發系統崩潰（用於測試崩潰轉儲與看門狗行為）
+  - 回應：`application/json`，`{"ok":true,"message":"Triggering system crash after 1000ms"}`
+  - 鑑權：是
+  - 警告：此介面會故意令系統崩潰，僅供除錯用途。
+
+- `GET /time`
+  - 作用：回傳目前 UTC 紀元毫秒時間、時區說明字串，以及本地牆鐘的 ISO 8601 風格字串（JSON）
+  - 回應：`application/json`，形如 `{"time_ms":1715529600123,"tz":"UTC0","iso8601":"2024-05-12T12:00:00+0000"}`
+  - 欄位：`time_ms` 為 UTC Unix 紀元毫秒（整數）；`tz` 為環境變數 `TZ` 的 POSIX 時區字串，未設定或為空時固定為 `UTC0`（若需香港時間可在韌體設定 `TZ` 為 `HKT-8` 等）；`iso8601` 為 `YYYY-MM-DDTHH:MM:SS` 後接 `strftime("%z")` 的數字偏移（如 `+0800`）
+  - 鑑權：否
+  - 說明：牆鐘依系統時間（如 SNTP）；未同步前可能不代表真實世界時間。
+
+- `GET /sys/uptime`
+  - 作用：回傳自本次上電以來已運行時長（毫秒）
+  - 回應：`application/json`，形如 `{"uptime_ms":12345678}`
+  - 鑑權：否
+  - 說明：`uptime_ms` 來自單調高精度計時器（`esp_timer`），與 SNTP 無關。
 
 ### 1.4 相機控制（全部置於 `/cam/*`）
 
@@ -328,8 +357,12 @@
 | `/stream` | `/cam/stream` | 已實作（遷移） |
 | `/status` | `/cam/status` | 已實作（移除 hostname/pitch/yaw/flash） |
 | `/config` | `/config` | 已實作 |
-| `/hostname` | `/sys/hostname` | 已實作（公開文字介面） |
-| `/restart` | `/restart` | 已實作 |
+| `/hostname` | `/sys/hostname` | 已實作（`text/plain` 純文字；Arduino 為 `GET /hostname`） |
+| — | `/sys/coredump` | 已實作（IDF；除錯用 coredump 下載端點） |
+| `/restart` | `/restart` | 已實作（需 Basic Auth，回應後重啟） |
+| — | `/crash` | 已實作（IDF；除錯用崩潰測試端點） |
+| — | `/time` | 已實作（IDF 擴充） |
+| — | `/sys/uptime` | 已實作（IDF 擴充） |
 | `/control` | `/cam/control` | 已實作（遷移到 /cam） |
 | `/xclk` | `/cam/xclk` | 已實作（遷移到 /cam） |
 | `/reg` | `/cam/reg` | 已實作（遷移到 /cam） |
@@ -340,11 +373,3 @@
 | `/silent` | （未實作） | 待補 |
 
 ---
-
-## 6. 備註（介面分層建議）
-
-- **使用者層（前端常用）**：`/cam/control`、`/cam/capture`、`/cam/stream`、`/cam/status`、`/servo`、`/servo/handle`、`/config`、`/sys/hostname`
-- **進階層（謹慎使用）**：`/cam/xclk`、`/servo/yaw`、`/servo/pitch`、`/servo/reset`
-- **除錯層（高風險）**：`/cam/reg`、`/cam/greg`、`/cam/pll`、`/cam/resolution`
-
-建議：除錯層介面預設隱藏於進階設定頁，僅在明確需求時開放。

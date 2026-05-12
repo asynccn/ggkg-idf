@@ -9,6 +9,7 @@
 
 #include "camera.h"
 #include "network.h"
+#include "time_sync.h"
 #include "webserver.h"
 #include "webserv_cam.h"
 #include "webserv_servo.h"
@@ -93,6 +94,7 @@ void app_main(void)
     esp_err_t err;
     config_init();
     ESP_LOGI(TAG, "Done loading config");
+    time_sync_init_timezone();
     err = console_start();
     if (err != ESP_OK)
     {

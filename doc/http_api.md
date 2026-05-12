@@ -49,6 +49,48 @@
   - Auth: Yes
   - Arduino source: `/config`
 
+- `GET /sys/hostname`
+  - Purpose: Returns the configured device hostname as **plain text only** (response body is the hostname string; not JSON).
+  - Response: `text/plain`
+  - Auth: No
+  - Note: Same value as the `hostname` config key (`GET /config?var=hostname` with auth). On the Arduino firmware this was exposed as `GET /hostname`; this project uses **`GET /sys/hostname`** instead.
+
+- `GET /sys/coredump`
+  - Purpose: Downloads the coredump partition as an ELF file for post-mortem debugging
+  - Response: `application/octet-stream` (binary file download)
+  - Filename: 
+    - With hostname: `ggkg_coredump_<hostname>_<client_ip>_<iso8601>.elf` (e.g., `ggkg_coredump_ggkgice_192.168.1.23_20260512T095005+0800.elf`)
+    - Without hostname: `ggkg_coredump_<client_ip>_<iso8601>.elf` (e.g., `ggkg_coredump_192.168.1.23_20260512T095005+0800.elf`)
+  - Size: 64KB (entire coredump partition)
+  - Auth: Yes
+  - Note: The partition is streamed in 4KB chunks. If flash encryption is enabled, the downloaded data will be encrypted and must be decrypted using `esptool.py` or `esp-coredump` tool with the appropriate flash encryption key before analysis. The client IP in the filename may appear as an IPv4-mapped IPv6 address (e.g., `___FFFF_192.168.1.23`).
+
+- `GET /restart`
+  - Purpose: Triggers a device reboot after the JSON response is sent
+  - Response: `application/json` — `{"ok":true,"restart":true}`
+  - Auth: Yes
+
+- `GET /crash`
+  - Purpose: Triggers a system crash via `assert(0)` after 1000ms delay (for testing crash dumps and watchdog behavior)
+  - Response: `application/json` — `{"ok":true,"message":"Triggering system crash after 1000ms"}`
+  - Auth: Yes
+  - Warning: This endpoint intentionally crashes the system. Use only for debugging purposes.
+
+- `GET /time`
+  - Purpose: Returns wall-clock metadata as JSON
+  - Response: `application/json`, shape `{"time_ms":<int>,"tz":"<string>","iso8601":"<string>"}`
+  - Fields:
+    - `time_ms`: UTC Unix epoch in milliseconds (integer)
+    - `tz`: POSIX `TZ` string from the runtime environment; if `TZ` is unset or empty, the value `UTC0` is reported
+    - `iso8601`: Local wall time as `YYYY-MM-DDTHH:MM:SS` followed by the numeric UTC offset from `strftime("%z")` (e.g. `+0800`, `+0000`)
+  - Auth: No
+  - Note: `time_ms` / `iso8601` follow system time (SNTP or other sync); before sync they may not reflect real-world time.
+
+- `GET /sys/uptime`
+  - Purpose: Returns time since boot in milliseconds (monotonic high-resolution timer)
+  - Response: `application/json`, shape `{"uptime_ms":<uint64>}`
+  - Auth: No
+
 ### 1.4 Camera Control (All under `/cam/*`)
 
 - `GET /cam/control` (legacy `/control`): General image parameter control
@@ -317,6 +359,12 @@
 | `/stream` | `/cam/stream` | Implemented (migrated) |
 | `/status` | `/cam/status` | Implemented (without hostname/pitch/yaw/flash) |
 | `/config` | `/config` | Implemented |
+| `/hostname` | `/sys/hostname` | Implemented (public `text/plain`; Arduino was `/hostname`) |
+| — | `/sys/coredump` | Implemented (IDF; debug endpoint for coredump download) |
+| `/restart` | `/restart` | Implemented (Basic Auth; reboot after response) |
+| — | `/crash` | Implemented (IDF; debug endpoint for crash testing) |
+| — | `/time` | Implemented (IDF) |
+| — | `/sys/uptime` | Implemented (IDF) |
 | `/control` | `/cam/control` | Implemented (migrated under `/cam`) |
 | `/xclk` | `/cam/xclk` | Implemented (migrated under `/cam`) |
 | `/reg` | `/cam/reg` | Implemented (migrated under `/cam`) |
@@ -327,11 +375,3 @@
 | `/silent` | (not implemented) | TODO |
 
 ---
-
-## 6. Notes (Interface Layering)
-
-- **User Layer (common front-end use)**: `/cam/control`, `/cam/capture`, `/cam/stream`, `/cam/status`, `/servo`, `/servo/handle`, `/config`
-- **Advanced Layer (use with caution)**: `/cam/xclk`, `/servo/yaw`, `/servo/pitch`, `/servo/reset`
-- **Debug Layer (high risk)**: `/cam/reg`, `/cam/greg`, `/cam/pll`, `/cam/resolution`
-
-Recommendation: Keep debug endpoints hidden in advanced settings and expose only when needed.

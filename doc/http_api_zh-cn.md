@@ -50,15 +50,44 @@
   - Arduino 版来源：`/config`
 
 - `GET /sys/hostname`
-  - 作用：返回设备 hostname 纯文本（仅返回 hostname 字符串）
+  - 作用：返回设备 hostname **纯文本**（响应体仅为 hostname 字符串，非 JSON）
   - 返回：`text/plain`
   - 鉴权：否
-  - 说明：用于前端页面标题和保存文件名前缀展示
+  - 说明：与配置项 `hostname` 一致（带鉴权可读写的 `GET /config?var=hostname`）。Arduino 旧版为 **`GET /hostname`**，本 IDF 版路径为 **`GET /sys/hostname`**。
+
+- `GET /sys/coredump`
+  - 作用：下载 coredump 分区作为 ELF 文件，用于事后调试分析
+  - 返回：`application/octet-stream`（二进制文件下载）
+  - 文件名：
+    - 有 hostname：`ggkg_coredump_<hostname>_<客户端IP>_<iso8601>.elf`（例如 `ggkg_coredump_ggkgice_192.168.1.23_20260512T095005+0800.elf`）
+    - 无 hostname：`ggkg_coredump_<客户端IP>_<iso8601>.elf`（例如 `ggkg_coredump_192.168.1.23_20260512T095005+0800.elf`）
+  - 大小：64KB（整个 coredump 分区）
+  - 鉴权：是
+  - 说明：分区以 4KB 块流式传输。若启用闪存加密，下载的数据将为加密状态，需使用 `esptool.py` 或 `esp-coredump` 工具配合适当的闪存加密密钥解密后才能分析。文件名中的客户端 IP 可能显示为 IPv4-mapped IPv6 地址格式（例如 `___FFFF_192.168.1.23`）。
 
 - `GET /restart`
-  - 作用：触发设备重启
-  - 返回：`{"ok":true,"restart":true}`
+  - 作用：返回 JSON 后触发设备重启
+  - 返回：`application/json`，`{"ok":true,"restart":true}`
   - 鉴权：是
+
+- `GET /crash`
+  - 作用：延迟 1000ms 后通过 `assert(0)` 触发系统崩溃（用于测试崩溃转储与看门狗行为）
+  - 返回：`application/json`，`{"ok":true,"message":"Triggering system crash after 1000ms"}`
+  - 鉴权：是
+  - 警告：此接口会故意使系统崩溃，仅供调试用途。
+
+- `GET /time`
+  - 作用：返回当前 UTC 纪元毫秒时间、时区说明字串，以及本地墙钟的 ISO 8601 风格字串（JSON）
+  - 返回：`application/json`，形如 `{"time_ms":1715529600123,"tz":"UTC0","iso8601":"2024-05-12T12:00:00+0000"}`
+  - 字段：`time_ms` 为 UTC Unix 纪元毫秒（整数）；`tz` 为环境变量 `TZ` 的 POSIX 时区字串，未设置或为空时固定为 `UTC0`（若需香港时间可在固件中设置 `TZ` 为 `HKT-8` 等）；`iso8601` 为 `YYYY-MM-DDTHH:MM:SS` 后接 `strftime("%z")` 产生的数字偏移（如 `+0800`）
+  - 鉴权：否
+  - 说明：墙钟依赖系统时间（如 SNTP）；未同步前可能不代表真实世界时间。
+
+- `GET /sys/uptime`
+  - 作用：返回自本次上电以来已运行时长（毫秒）
+  - 返回：`application/json`，形如 `{"uptime_ms":12345678}`
+  - 鉴权：否
+  - 说明：`uptime_ms` 来自单调高精度计时器（`esp_timer`），与 SNTP 无关。
 
 ### 1.4 摄像头控制（已全部放到 `/cam/*`）
 
@@ -328,8 +357,12 @@
 | `/stream` | `/cam/stream` | 已实现（迁移） |
 | `/status` | `/cam/status` | 已实现（去除 hostname/pitch/yaw/flash） |
 | `/config` | `/config` | 已实现 |
-| `/hostname` | `/sys/hostname` | 已实现（公开文本接口） |
-| `/restart` | `/restart` | 已实现 |
+| `/hostname` | `/sys/hostname` | 已实现（`text/plain` 纯文本；Arduino 为 `GET /hostname`） |
+| — | `/sys/coredump` | 已实现（IDF；调试用 coredump 下载端点） |
+| `/restart` | `/restart` | 已实现（需 Basic Auth，应答后重启） |
+| — | `/crash` | 已实现（IDF；调试用崩溃测试端点） |
+| — | `/time` | 已实现（IDF 扩展） |
+| — | `/sys/uptime` | 已实现（IDF 扩展） |
 | `/control` | `/cam/control` | 已实现（迁移到 /cam 下） |
 | `/xclk` | `/cam/xclk` | 已实现（迁移到 /cam 下） |
 | `/reg` | `/cam/reg` | 已实现（迁移到 /cam 下） |
@@ -340,11 +373,3 @@
 | `/silent` | （未实现） | 待补 |
 
 ---
-
-## 6. 备注（接口分层建议）
-
-- **用户层（前端常用）**：`/cam/control`、`/cam/capture`、`/cam/stream`、`/cam/status`、`/servo`、`/servo/handle`、`/config`、`/sys/hostname`
-- **高级层（谨慎使用）**：`/cam/xclk`、`/servo/yaw`、`/servo/pitch`、`/servo/reset`
-- **调试层（高风险）**：`/cam/reg`、`/cam/greg`、`/cam/pll`、`/cam/resolution`
-
-建议：调试层接口默认隐藏在高级设置页，仅在明确需求时开放。

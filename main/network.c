@@ -35,6 +35,7 @@
 
 #include "config_vars.h"
 #include "network.h"
+#include "time_sync.h"
 
 #define EXAMPLE_ESP_MAXIMUM_RETRY  65535
 
@@ -253,6 +254,8 @@ static void event_handler(void *arg, esp_event_base_t event_base,
                 ESP_LOGW(TAG, "apply dns failed: %s", esp_err_to_name(err));
             }
         }
+
+        time_sync_sntp_after_ip();
     }
 }
 
