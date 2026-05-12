@@ -34,6 +34,7 @@
 #include "esp_partition.h"
 #include "esp_system.h"
 #include "esp_timer.h"
+#include "esp_core_dump.h"
 
 #include "config.h"
 #include "config_keys.h"
@@ -628,18 +629,49 @@ static esp_err_t handler_coredump(httpd_req_t *req)
         return ESP_OK;
     }
 
-    // Find coredump partition
+    // Use ESP-IDF API to check if coredump exists
+    size_t coredump_addr = 0;
+    size_t coredump_size = 0;
+    err = esp_core_dump_image_get(&coredump_addr, &coredump_size);
+    if (err == ESP_ERR_NOT_FOUND)
+    {
+        ESP_LOGW(TAG, "no coredump found in flash");
+        httpd_resp_set_status(req, "404 Not Found");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, "{\"ok\":false,\"error\":\"no coredump found\"}", HTTPD_RESP_USE_STRLEN);
+        return ESP_OK;
+    }
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "failed to get coredump image: %s", esp_err_to_name(err));
+        httpd_resp_send_500(req);
+        return err;
+    }
+
+    // Find coredump partition to read data
     const esp_partition_t *coredump_part = esp_partition_find_first(
         ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_COREDUMP, NULL);
     
     if (coredump_part == NULL)
     {
         ESP_LOGE(TAG, "coredump partition not found");
-        httpd_resp_set_status(req, "404 Not Found");
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    // ESP-IDF coredump format: 20 bytes (0x14) header before ELF data
+    const size_t COREDUMP_HEADER_SIZE = 0x14;
+    
+    if (coredump_size <= COREDUMP_HEADER_SIZE)
+    {
+        ESP_LOGW(TAG, "coredump too small: %zu bytes", coredump_size);
+        httpd_resp_set_status(req, "500 Internal Server Error");
         httpd_resp_set_type(req, "application/json");
-        httpd_resp_send(req, "{\"ok\":false,\"error\":\"coredump partition not found\"}", HTTPD_RESP_USE_STRLEN);
+        httpd_resp_send(req, "{\"ok\":false,\"error\":\"coredump data too small\"}", HTTPD_RESP_USE_STRLEN);
         return ESP_OK;
     }
+    
+    size_t elf_size = coredump_size - COREDUMP_HEADER_SIZE;
 
     // Generate filename with hostname, IP/domain, and ISO 8601 timestamp
     struct timeval tv;
@@ -656,51 +688,61 @@ static esp_err_t handler_coredump(httpd_req_t *req)
         strftime(iso_time + n, sizeof(iso_time) - n, "%z", &tm_local);
     }
     
-    // Get client IP address or use "unknown"
-    char client_addr[64] = "unknown";
-    int sockfd = httpd_req_to_sockfd(req);
-    if (sockfd >= 0)
+    // Get server's own IP/hostname from HTTP Host header
+    char server_addr[64] = "unknown";
+    size_t host_len = httpd_req_get_hdr_value_len(req, "Host");
+    if (host_len > 0 && host_len < sizeof(server_addr))
     {
-        struct sockaddr_in6 addr;
-        socklen_t addr_len = sizeof(addr);
-        if (getpeername(sockfd, (struct sockaddr *)&addr, &addr_len) == 0)
+        if (httpd_req_get_hdr_value_str(req, "Host", server_addr, sizeof(server_addr)) == ESP_OK)
         {
-            if (addr.sin6_family == AF_INET)
+            // Remove port number if present (e.g., "10.8.107.32:80" -> "10.8.107.32")
+            char *colon = strchr(server_addr, ':');
+            if (colon != NULL)
             {
-                struct sockaddr_in *addr_in = (struct sockaddr_in *)&addr;
-                inet_ntop(AF_INET, &addr_in->sin_addr, client_addr, sizeof(client_addr));
-            }
-            else if (addr.sin6_family == AF_INET6)
-            {
-                inet_ntop(AF_INET6, &addr.sin6_addr, client_addr, sizeof(client_addr));
+                *colon = '\0';
             }
         }
     }
     
-    // Build filename: ggkg_coredump_<hostname>_<ip>_<iso8601>.elf
-    // or if no hostname: ggkg_coredump_<ip>_<iso8601>.elf
+    // Fallback: get server's own IP from socket if Host header not available
+    if (strcmp(server_addr, "unknown") == 0)
+    {
+        int sockfd = httpd_req_to_sockfd(req);
+        if (sockfd >= 0)
+        {
+            struct sockaddr_in6 addr;
+            socklen_t addr_len = sizeof(addr);
+            if (getsockname(sockfd, (struct sockaddr *)&addr, &addr_len) == 0)
+            {
+                if (addr.sin6_family == AF_INET)
+                {
+                    struct sockaddr_in *addr_in = (struct sockaddr_in *)&addr;
+                    inet_ntop(AF_INET, &addr_in->sin_addr, server_addr, sizeof(server_addr));
+                }
+                else if (addr.sin6_family == AF_INET6)
+                {
+                    inet_ntop(AF_INET6, &addr.sin6_addr, server_addr, sizeof(server_addr));
+                }
+            }
+        }
+    }
+    
+    // Build filename: ggkg_coredump_<hostname>_<server_addr>_<iso8601>.elf
+    // or if no hostname: ggkg_coredump_<server_addr>_<iso8601>.elf
     char filename[256] = {0};
     if (cfg_hostname[0] != '\0')
     {
         snprintf(filename, sizeof(filename), 
                  "attachment; filename=\"ggkg_coredump_%s_%s_%s.elf\"",
-                 cfg_hostname, client_addr, iso_time);
+                 cfg_hostname, server_addr, iso_time);
     }
     else
     {
         snprintf(filename, sizeof(filename), 
                  "attachment; filename=\"ggkg_coredump_%s_%s.elf\"",
-                 client_addr, iso_time);
+                 server_addr, iso_time);
     }
-
-    // Set response headers for file download
-    httpd_resp_set_type(req, "application/octet-stream");
-    httpd_resp_set_hdr(req, "Content-Disposition", filename);
     
-    char content_length[32] = {0};
-    snprintf(content_length, sizeof(content_length), "%lu", coredump_part->size);
-    httpd_resp_set_hdr(req, "Content-Length", content_length);
-
     // Allocate buffer for streaming
     uint8_t *chunk_buf = (uint8_t *)malloc(4096);
     if (chunk_buf == NULL)
@@ -709,15 +751,39 @@ static esp_err_t handler_coredump(httpd_req_t *req)
         httpd_resp_send_500(req);
         return ESP_ERR_NO_MEM;
     }
-
-    // Stream coredump partition data
-    // Note: The data is stored as-is from esp_core_dump. If flash encryption is enabled,
-    // the partition content will be encrypted. The coredump should be decrypted using
-    // esptool.py or esp-coredump tool with the appropriate flash encryption key.
-    size_t offset = 0;
-    size_t remaining = coredump_part->size;
     
-    ESP_LOGI(TAG, "streaming coredump partition, size=%lu bytes", coredump_part->size);
+    // Verify ELF magic bytes at offset 0x14
+    uint8_t elf_magic[4] = {0};
+    err = esp_partition_read(coredump_part, COREDUMP_HEADER_SIZE, elf_magic, sizeof(elf_magic));
+    if (err != ESP_OK || elf_magic[0] != 0x7F || elf_magic[1] != 'E' || 
+        elf_magic[2] != 'L' || elf_magic[3] != 'F')
+    {
+        ESP_LOGW(TAG, "invalid ELF magic at offset 0x%x: %02x %02x %02x %02x", 
+                 (unsigned int)COREDUMP_HEADER_SIZE, elf_magic[0], elf_magic[1], elf_magic[2], elf_magic[3]);
+        free(chunk_buf);
+        httpd_resp_set_status(req, "500 Internal Server Error");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_send(req, "{\"ok\":false,\"error\":\"corrupted coredump data\"}", HTTPD_RESP_USE_STRLEN);
+        return ESP_OK;
+    }
+    
+    // Set response headers for file download
+    httpd_resp_set_type(req, "application/octet-stream");
+    httpd_resp_set_hdr(req, "Content-Disposition", filename);
+    
+    char content_length[32] = {0};
+    snprintf(content_length, sizeof(content_length), "%zu", elf_size);
+    httpd_resp_set_hdr(req, "Content-Length", content_length);
+    
+    // Stream ELF data only (skip the ESP-IDF coredump header)
+    // Note: If flash encryption is enabled, the partition content will be encrypted.
+    // The coredump should be decrypted using esptool.py or esp-coredump tool 
+    // with the appropriate flash encryption key.
+    size_t offset = COREDUMP_HEADER_SIZE;  // Start from ELF data
+    size_t remaining = elf_size;
+    
+    ESP_LOGI(TAG, "streaming coredump ELF, size=%zu bytes (total=%zu, addr=0x%zx)", 
+             elf_size, coredump_size, coredump_addr);
 
     while (remaining > 0)
     {
@@ -747,7 +813,7 @@ static esp_err_t handler_coredump(httpd_req_t *req)
     httpd_resp_send_chunk(req, NULL, 0);
     
     free(chunk_buf);
-    ESP_LOGI(TAG, "coredump download completed, %lu bytes sent", coredump_part->size);
+    ESP_LOGI(TAG, "coredump download completed, %zu bytes sent (ELF data)", elf_size);
     
     return ESP_OK;
 }
